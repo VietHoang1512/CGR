@@ -3,8 +3,8 @@ import argparse
 import pandas as pd
 import torch
 
-from gdro_data import dfr_datasets
-from gdro_data.data import dataset_attributes, shift_types, log_data
+from data import dfr_datasets
+from data.data import dataset_attributes, shift_types, log_data
 from utils import set_seed, Logger, CSVBatchLogger, log_args, prepare_logging
 from train import train
 
@@ -46,9 +46,24 @@ def get_parser():
     # Model
     parser.add_argument(
         '--model',
-        choices=list(model_attributes.keys()) + dir(models),
+        choices= dir(models),
         default='resnet50')
     parser.add_argument('--train_from_scratch', action='store_true', default=False)
+
+    parser.add_argument(
+        "--moo_method",
+        type=str,
+        choices=[
+            "mgda",
+            "pcgrad",
+            "cagrad",
+            "imtl",
+            "ew",
+        ],
+        default="imtl",
+        help="MTL weight method",
+    )
+
 
     # Optimization
     parser.add_argument('--n_epochs', type=int, default=4)

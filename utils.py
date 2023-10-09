@@ -153,3 +153,35 @@ def log_to_tb(writer, epoch, results, n_groups, tag):
     for i in range(n_groups):
         new_results[f"acc_group:{i}"] = results[f"avg_acc_group:{i}"]
     write_dict_to_tb(writer, new_results, tag, epoch)
+
+def get_parameters(net):
+    params = []
+    for _, param in net.named_parameters():
+        params.append(param.data.clone().flatten())
+    return torch.cat(params)
+
+def get_gradient(net):
+    grads = []
+    for _, param in net.named_parameters():
+        if param.grad is not None:
+            grads.append(param.grad.data.clone().flatten())
+        else:
+            grads.append(torch.zeros_like(param.data).flatten())
+    return torch.cat(grads)
+
+def set_parameters(net, params):
+    offset = 0
+    for name, param in net.named_parameters():
+        numel = param.data.numel()
+        param.data = params[offset:offset+numel].view(param.data.shape)
+        offset += numel
+    assert offset == params.numel(), f"Size mismatched {offset} != {params.numel()}"
+    
+def set_gradient(net, grads):
+    offset = 0
+    for name, param in net.named_parameters():
+        numel = param.data.numel()
+        param.grad = grads[offset:offset+numel].view(param.data.shape)
+        offset += numel
+    assert offset == grads.numel(), f"Size mismatched {offset} != {grads.numel()}"
+    

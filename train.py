@@ -1,16 +1,11 @@
 import os
-import types
-
 import gc
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader, Subset
+
 
 import numpy as np
 from tqdm import tqdm
 
-from utils import AverageMeter, accuracy
 from loss import LossComputer
 from utils import log_to_tb
 from pytorch_transformers import AdamW, WarmupLinearSchedule
@@ -41,6 +36,7 @@ def run_epoch(epoch, model, optimizer, loader, loss_computer, logger, writer, cs
             x = batch[0]
             y = batch[1]
             g = batch[2]
+
             if args.model == 'bert':
                 input_ids = x[:, :, 0]
                 input_masks = x[:, :, 1]
@@ -58,15 +54,21 @@ def run_epoch(epoch, model, optimizer, loader, loss_computer, logger, writer, cs
 
             if is_training:
                 if args.model == 'bert':
-                    loss_main.backward()
+                    model.zero_grad()
+                    # loss_main.backward()
+                    loss_main = loss_computer.compute_grads(loss_main, model, args)
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
                     scheduler.step()
                     optimizer.step()
                     model.zero_grad()
                 else:
                     optimizer.zero_grad()
-                    loss_main.backward()
+                    loss_main = loss_computer.compute_grads(loss_main, model, args)
+                    
+                    # loss_main.backward()
                     optimizer.step()
+                    model.zero_grad()
+                    
 
             if is_training and (batch_idx+1) % log_every==0:
                 csv_logger.log(epoch, batch_idx, loss_computer.get_stats(model, args))
@@ -99,15 +101,7 @@ def train(model, criterion, dataset,
 
     train_loss_computer = LossComputer(
         criterion,
-        is_robust=args.robust,
-        dataset=dataset['train_data'],
-        alpha=args.alpha,
-        gamma=args.gamma,
-        adj=adjustments,
-        step_size=args.robust_step_size,
-        normalize_loss=args.use_normalized_loss,
-        btl=args.btl,
-        min_var_weight=args.minimum_variational_weight)
+        dataset=dataset['train_data'])
 
     # BERT uses its own scheduler and optimizer
     if 'bert' in args.model:
@@ -162,26 +156,23 @@ def train(model, criterion, dataset,
         logger.write(f'\nValidation:\n')
         val_loss_computer = LossComputer(
             criterion,
-            is_robust=args.robust,
             dataset=dataset['val_data'],
-            step_size=args.robust_step_size,
-            alpha=args.alpha)
+            )
         run_epoch(
             epoch, model, optimizer,
             dataset['val_loader'],
             val_loss_computer,
             logger, writer, val_csv_logger, args,
             is_training=False, tag="val")
-
+        
         # Test set; don't print to avoid peeking
         if dataset['test_data'] is not None:
             logger.write(f'\nTest:\n')
             test_loss_computer = LossComputer(
                 criterion,
-                is_robust=args.robust,
                 dataset=dataset['test_data'],
-                step_size=args.robust_step_size,
-                alpha=args.alpha)
+                )
+
             run_epoch(
                 epoch, model, optimizer,
                 dataset['test_loader'],
@@ -196,10 +187,7 @@ def train(model, criterion, dataset,
                 logger.write('Current lr: %f\n' % curr_lr)
 
         if args.scheduler and args.model != 'bert':
-            if args.robust:
-                val_loss, _ = val_loss_computer.compute_robust_loss_greedy(val_loss_computer.avg_group_loss, val_loss_computer.avg_group_loss)
-            else:
-                val_loss = val_loss_computer.avg_actual_loss
+            val_loss = val_loss_computer.avg_group_loss
             scheduler.step(val_loss) # scheduler step to update lr at the end of epoch
 
         if epoch % args.save_step == 0 and epoch > 0:
