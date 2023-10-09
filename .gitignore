@@ -2,9 +2,6 @@
 **/outputs
 **logs
 
-# data
-**/data
-
 # stuff
 .flake8
 .isort.cfg

@@ -149,7 +149,7 @@ def train(model, criterion, dataset,
             train_loss_computer,
             logger, writer, train_csv_logger, args,
             is_training=True, tag="train",
-            show_progress=args.show_progress,
+            show_progress=True,
             log_every=args.log_every,
             scheduler=scheduler)
 
@@ -190,13 +190,13 @@ def train(model, criterion, dataset,
             val_loss = val_loss_computer.avg_group_loss
             scheduler.step(val_loss) # scheduler step to update lr at the end of epoch
 
-        if epoch % args.save_step == 0 and epoch > 0:
-            # torch.save(model, os.path.join(args.log_dir, '%d_model.pth' % epoch))
-            torch.save(model.state_dict(), os.path.join(args.log_dir, "%d_model_weights.pt" % epoch))
+        # if epoch % args.save_step == 0 and epoch > 0:
+        #     # torch.save(model, os.path.join(args.log_dir, '%d_model.pth' % epoch))
+        #     torch.save(model.state_dict(), os.path.join(args.log_dir, "%d_model_weights.pt" % epoch))
 
-        if args.save_last:
-            # torch.save(model, os.path.join(args.log_dir, 'last_model.pth'))
-            torch.save(model.state_dict(), os.path.join(args.log_dir, "last_model_weights.pt"))
+        # if args.save_last:
+        #     # torch.save(model, os.path.join(args.log_dir, 'last_model.pth'))
+        #     torch.save(model.state_dict(), os.path.join(args.log_dir, "last_model_weights.pt"))
 
         if args.save_best:
             if args.robust or args.reweight_groups:
