@@ -10,8 +10,9 @@ from loss import LossComputer
 from utils import log_to_tb
 from pytorch_transformers import AdamW, WarmupLinearSchedule
 
+from models.vit.schedulers import make_scheduler
 
-def run_epoch(epoch, model, optimizer, loader, loss_computer, logger, writer, csv_logger, args,
+def run_epoch(epoch, model, criterion, optimizer, loader, loader_name, loss_computer, logger, writer, csv_logger, args,
               is_training, tag, show_progress=False, log_every=50, scheduler=None):
     """
     scheduler is only used inside this function if model is bert.
@@ -25,9 +26,9 @@ def run_epoch(epoch, model, optimizer, loader, loss_computer, logger, writer, cs
         model.eval()
 
     if show_progress:
-        prog_bar_loader = tqdm(loader)
+        prog_bar_loader = tqdm(loader[loader_name])
     else:
-        prog_bar_loader = loader
+        prog_bar_loader = loader[loader_name]
 
     with torch.set_grad_enabled(is_training):
         for batch_idx, batch in enumerate(prog_bar_loader):
@@ -68,6 +69,8 @@ def run_epoch(epoch, model, optimizer, loader, loss_computer, logger, writer, cs
                     # loss_main.backward()
                     optimizer.step()
                     model.zero_grad()
+                    if scheduler:
+                        scheduler.step()
                     
 
             if is_training and (batch_idx+1) % log_every==0:
@@ -76,6 +79,33 @@ def run_epoch(epoch, model, optimizer, loader, loss_computer, logger, writer, cs
                 log_to_tb(writer, epoch, loss_computer.get_stats(model, args), loss_computer.n_groups, tag="train")
                 loss_computer.log_stats(logger, is_training)
                 loss_computer.reset_stats()
+                
+                logger.write(f'\nValidation:\n')
+                val_loss_computer = LossComputer(
+                    criterion,
+                    dataset=loader['val_data'],
+                    )
+                run_epoch(
+                    epoch, model, criterion, optimizer,
+                    loader, 'val_loader',
+                    val_loss_computer,
+                    logger, writer, csv_logger, args,
+                    is_training=False, tag="val")
+                
+                # Test set; don't print to avoid peeking
+                if loader['test_data'] is not None:
+                    logger.write(f'\nTest:\n')
+                    test_loss_computer = LossComputer(
+                        criterion,
+                        dataset=loader['test_data'],
+                        )
+
+                    run_epoch(
+                        epoch, model, criterion, optimizer,
+                        loader, 'test_loader',
+                        test_loss_computer,
+                        logger, writer, csv_logger, args,
+                        is_training=False, tag="test")                
 
         if (not is_training) or loss_computer.batch_count > 0:
             csv_logger.log(epoch, batch_idx, loss_computer.get_stats(model, args))
@@ -86,18 +116,12 @@ def run_epoch(epoch, model, optimizer, loader, loss_computer, logger, writer, cs
                 loss_computer.reset_stats()
 
 
-def train(model, criterion, dataset,
+def train(model, criterion, dataset, 
           logger, writer, train_csv_logger, val_csv_logger, test_csv_logger,
           args, epoch_offset):
-    model = model.cuda()
 
-    # process generalization adjustment stuff
-    adjustments = [float(c) for c in args.generalization_adjustment.split(',')]
-    assert len(adjustments) in (1, dataset['train_data'].n_groups)
-    if len(adjustments)==1:
-        adjustments = np.array(adjustments* dataset['train_data'].n_groups)
-    else:
-        adjustments = np.array(adjustments)
+
+    model = model.cuda()
 
     train_loss_computer = LossComputer(
         criterion,
@@ -136,16 +160,27 @@ def train(model, criterion, dataset,
                 threshold=0.0001,
                 min_lr=0,
                 eps=1e-08)
+        elif 'vit' in args.model.lower():
+            scheduler = make_scheduler(
+                optimizer
+            )
         else:
             scheduler = None
+
+    # Double check
+    enabled = set()
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            enabled.add(name)
+    logger.write(f"Parameters to be updated: {enabled}")
 
     best_val_acc = 0
     for epoch in range(epoch_offset, epoch_offset+args.n_epochs):
         logger.write('\nEpoch [%d]:\n' % epoch)
         logger.write(f'Training:\n')
         run_epoch(
-            epoch, model, optimizer,
-            dataset['train_loader'],
+            epoch, model, criterion, optimizer,
+            dataset, 'train_loader',
             train_loss_computer,
             logger, writer, train_csv_logger, args,
             is_training=True, tag="train",
@@ -159,8 +194,8 @@ def train(model, criterion, dataset,
             dataset=dataset['val_data'],
             )
         run_epoch(
-            epoch, model, optimizer,
-            dataset['val_loader'],
+            epoch, model, criterion, optimizer,
+            dataset, 'val_loader',
             val_loss_computer,
             logger, writer, val_csv_logger, args,
             is_training=False, tag="val")
@@ -174,8 +209,8 @@ def train(model, criterion, dataset,
                 )
 
             run_epoch(
-                epoch, model, optimizer,
-                dataset['test_loader'],
+                epoch, model, criterion, optimizer,
+                dataset, 'test_loader',
                 test_loss_computer,
                 logger, writer, test_csv_logger, args,
                 is_training=False, tag="test")
@@ -211,15 +246,7 @@ def train(model, criterion, dataset,
                 np.save(os.path.join(args.log_dir, "best_epoch_num.npy"), [epoch])
                 logger.write(f'Best model saved at epoch {epoch}\n')
 
-        if args.automatic_adjustment:
-            gen_gap = val_loss_computer.avg_group_loss - train_loss_computer.exp_avg_loss
-            adjustments = gen_gap * torch.sqrt(train_loss_computer.group_counts)
-            train_loss_computer.adj = adjustments
-            logger.write('Adjustments updated\n')
-            for group_idx in range(train_loss_computer.n_groups):
-                logger.write(
-                    f'  {train_loss_computer.get_group_name(group_idx)}:\t'
-                    f'adj = {train_loss_computer.adj[group_idx]:.3f}\n')
+
         logger.write('\n')
 
         gc.collect()

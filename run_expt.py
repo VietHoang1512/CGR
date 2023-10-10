@@ -34,19 +34,12 @@ def get_parser():
     parser.add_argument('--augment_data', action='store_true', default=False)
     parser.add_argument('--val_fraction', type=float, default=0.1)
     # Objective
-    parser.add_argument('--robust', default=False, action='store_true')
     parser.add_argument('--alpha', type=float, default=0.2)
-    parser.add_argument('--generalization_adjustment', default="0.0")
-    parser.add_argument('--automatic_adjustment', default=False, action='store_true')
-    parser.add_argument('--robust_step_size', default=0.01, type=float)
-    parser.add_argument('--use_normalized_loss', default=False, action='store_true')
-    parser.add_argument('--btl', default=False, action='store_true')
     parser.add_argument('--hinge', default=False, action='store_true')
 
     # Model
     parser.add_argument(
         '--model',
-        choices= dir(models),
         default='resnet50')
     parser.add_argument('--train_from_scratch', action='store_true', default=False)
 
@@ -63,6 +56,7 @@ def get_parser():
         default="imtl",
         help="MTL weight method",
     )
+    parser.add_argument('--num_tokens', type=int, default=5)
 
 
     # Optimization
@@ -128,13 +122,6 @@ def main(args):
     test_data = None
     test_loader = None
 
-    # if args.dfr_data:
-    #     train_data, val_data, test_data = dfr_datasets.prepare_data(
-    #         args, train=True)
-    # elif args.shift_type == 'confounder':
-    #     train_data, val_data, test_data = prepare_data(args, train=True)
-    # elif args.shift_type == 'label_shift_step':
-    #     train_data, val_data = prepare_data(args, train=True)
 
     train_data, val_data, test_data = dfr_datasets.prepare_data(args, train=True)
 
@@ -154,9 +141,15 @@ def main(args):
     n_classes = train_data.n_classes
 
     log_data(data, logger)
-    print("Using DFR model")
-    model_cls = getattr(models, args.model)
-    model = model_cls(n_classes)
+    if "vit" in args.model.lower():        
+        print("Using ViT")
+        from models.vit.build_model import build_model
+        model = build_model(args, n_classes)        
+
+    else:
+        print("Using DFR model")
+        model_cls = getattr(models, args.model)
+        model = model_cls(n_classes)
 
     logger.flush()
 

@@ -17,6 +17,10 @@ nvidia-smi
 
 cd /scratch/hvp2011/implement/dfr/dfr_group_DRO/
 
-python run_expt.py -s confounder -d CUB -t waterbird_complete95 --log_dir logs/wb-imtl/sgd/seed=0 --seed 0 --root_dir /scratch/hvp2011/implement/spurious-correlation/data/waterbird_complete95_forest2water2 -c forest2water2 --lr 0.001 --batch_size 128 --weight_decay 0.0001 --model imagenet_resnet50_pretrained --n_epochs 200 --reweight_groups --robust --gamma 0.1 --generalization_adjustment 0
-python run_expt.py -s confounder -d CUB -t waterbird_complete95 --log_dir logs/wb-imtl/sgd/seed=1 --seed 1 --root_dir /scratch/hvp2011/implement/spurious-correlation/data/waterbird_complete95_forest2water2 -c forest2water2 --lr 0.001 --batch_size 128 --weight_decay 0.0001 --model imagenet_resnet50_pretrained --n_epochs 200 --reweight_groups --robust --gamma 0.1 --generalization_adjustment 0
-python run_expt.py -s confounder -d CUB -t waterbird_complete95 --log_dir logs/wb-imtl/sgd/seed=2 --seed 2 --root_dir /scratch/hvp2011/implement/spurious-correlation/data/waterbird_complete95_forest2water2 -c forest2water2 --lr 0.001 --batch_size 128 --weight_decay 0.0001 --model imagenet_resnet50_pretrained --n_epochs 200 --reweight_groups --robust --gamma 0.1 --generalization_adjustment 0
+python run_expt.py --log_dir logs/wb/resnet/sgd/pcgrad/seed=0 --seed 0  --moo_method pcgrad  --lr 0.001 --batch_size 128 --weight_decay 0.0001 --model imagenet_resnet50_pretrained --n_epochs 200 --reweight_groups   --root_dir /scratch/hvp2011/implement/spurious-correlation/data/waterbird_complete95_forest2water2  -s confounder -d CUB -t waterbird_complete95 -c forest2water2
+python run_expt.py --log_dir logs/wb/resnet/sgd/pcgrad/seed=1 --seed 1  --moo_method pcgrad  --lr 0.001 --batch_size 128 --weight_decay 0.0001 --model imagenet_resnet50_pretrained --n_epochs 200 --reweight_groups   --root_dir /scratch/hvp2011/implement/spurious-correlation/data/waterbird_complete95_forest2water2  -s confounder -d CUB -t waterbird_complete95 -c forest2water2
+python run_expt.py --log_dir logs/wb/resnet/sgd/pcgrad/seed=2 --seed 2  --moo_method pcgrad  --lr 0.001 --batch_size 128 --weight_decay 0.0001 --model imagenet_resnet50_pretrained --n_epochs 200 --reweight_groups   --root_dir /scratch/hvp2011/implement/spurious-correlation/data/waterbird_complete95_forest2water2  -s confounder -d CUB -t waterbird_complete95 -c forest2water2
+
+# python run_expt.py --log_dir logs/wb-prompt/imtl/sgd/seed=0 --seed 0  --moo_method imtl  --num_tokens 3  --lr 3e-5 --batch_size 128 --weight_decay 0.0001 --model imagenet21k_ViT-B_16 --n_epochs 200 --reweight_groups     --root_dir /scratch/hvp2011/implement/spurious-correlation/data/waterbird_complete95_forest2water2  -s confounder -d CUB -t waterbird_complete95 -c forest2water2
+
+
