@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 import numpy as np
 import torch
-from pytorch_transformers import AdamW, WarmupLinearSchedule
+
 
 from loss import LossComputer
 from utils import log_to_tb
@@ -140,6 +140,8 @@ def train(model, criterion, dataset,
 
     # BERT uses its own scheduler and optimizer
     if 'bert' in args.model:
+        from pytorch_transformers import AdamW, WarmupLinearSchedule
+        
         logger.write("BERT model")
         no_decay = ['bias', 'LayerNorm.weight']
         optimizer_grouped_parameters = [

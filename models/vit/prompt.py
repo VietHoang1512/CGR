@@ -167,6 +167,7 @@ class PromptGenerator(nn.Module):
             layer = nn.Linear(preference_embedding_dim, length)
             # nn.init.xavier_uniform_(layer.weight)
             setattr(self, layer_name, layer)
+            
     def forward(self, preference):
         # preference embedding
         pref_embedding = torch.zeros(
