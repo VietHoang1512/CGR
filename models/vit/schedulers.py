@@ -6,7 +6,7 @@ from torch.optim.lr_scheduler import LambdaLR
 
 
 def make_scheduler(
-    optimizer: optim.Optimizer, scheduler_name:str="cosine", warmup: int = 5, total_iters: int=200
+    optimizer: optim.Optimizer, scheduler_name:str="cosine", warmup: int = 0, total_iters: int=200
 ) -> LambdaLR:
 
 

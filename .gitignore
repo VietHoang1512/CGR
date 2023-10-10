@@ -1,6 +1,8 @@
 # experiments
 **/outputs
 **logs
+*np
+*npz
 
 # stuff
 .flake8

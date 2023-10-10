@@ -1,18 +1,19 @@
 import os
 import gc
-import torch
-
+from tqdm import tqdm
 
 import numpy as np
-from tqdm import tqdm
+import torch
+from pytorch_transformers import AdamW, WarmupLinearSchedule
 
 from loss import LossComputer
 from utils import log_to_tb
-from pytorch_transformers import AdamW, WarmupLinearSchedule
+
 
 from models.vit.schedulers import make_scheduler
 
-def run_epoch(epoch, model, criterion, optimizer, loader, loader_name, loss_computer, logger, writer, csv_logger, args,
+
+def run_epoch(epoch, model, criterion, optimizer, loader, loader_name, loss_computer, logger, writer, args,
               is_training, tag, show_progress=False, log_every=50, scheduler=None):
     """
     scheduler is only used inside this function if model is bert.
@@ -47,7 +48,7 @@ def run_epoch(epoch, model, criterion, optimizer, loader, loader_name, loss_comp
                     attention_mask=input_masks,
                     token_type_ids=segment_ids,
                     labels=y
-                )[1] # [1] returns logits
+                )[1]  # [1] returns logits
             else:
                 outputs = model(x)
 
@@ -57,90 +58,102 @@ def run_epoch(epoch, model, criterion, optimizer, loader, loader_name, loss_comp
                 if args.model == 'bert':
                     model.zero_grad()
                     # loss_main.backward()
-                    loss_main = loss_computer.compute_grads(loss_main, model, args)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    loss_main = loss_computer.compute_grads(
+                        loss_main, model, args)
+                    torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), args.max_grad_norm)
                     scheduler.step()
                     optimizer.step()
                     model.zero_grad()
                 else:
                     optimizer.zero_grad()
-                    loss_main = loss_computer.compute_grads(loss_main, model, args)
-                    
+                    loss_main = loss_computer.compute_grads(
+                        loss_main, model, args)
+
                     # loss_main.backward()
                     optimizer.step()
                     model.zero_grad()
                     if scheduler:
                         scheduler.step()
-                    
 
-            if is_training and (batch_idx+1) % log_every==0:
-                csv_logger.log(epoch, batch_idx, loss_computer.get_stats(model, args))
-                csv_logger.flush()
-                log_to_tb(writer, epoch, loss_computer.get_stats(model, args), loss_computer.n_groups, tag="train")
+            if is_training and (batch_idx+1) % log_every == 0:
+                log_to_tb(writer, epoch, loss_computer.get_stats(
+                    model, args), loss_computer.n_groups, tag="train")
                 loss_computer.log_stats(logger, is_training)
                 loss_computer.reset_stats()
-                
+
                 logger.write(f'\nValidation:\n')
                 val_loss_computer = LossComputer(
                     criterion,
                     dataset=loader['val_data'],
-                    )
+                )
                 run_epoch(
                     epoch, model, criterion, optimizer,
                     loader, 'val_loader',
                     val_loss_computer,
-                    logger, writer, csv_logger, args,
+                    logger, writer,  args,
                     is_training=False, tag="val")
-                
+
                 # Test set; don't print to avoid peeking
                 if loader['test_data'] is not None:
                     logger.write(f'\nTest:\n')
                     test_loss_computer = LossComputer(
                         criterion,
                         dataset=loader['test_data'],
-                        )
+                    )
 
                     run_epoch(
                         epoch, model, criterion, optimizer,
                         loader, 'test_loader',
                         test_loss_computer,
-                        logger, writer, csv_logger, args,
-                        is_training=False, tag="test")                
+                        logger, writer, args,
+                        is_training=False, tag="test")
 
         if (not is_training) or loss_computer.batch_count > 0:
-            csv_logger.log(epoch, batch_idx, loss_computer.get_stats(model, args))
-            csv_logger.flush()
-            log_to_tb(writer, epoch, loss_computer.get_stats(model, args), loss_computer.n_groups, tag=tag)
+
+            log_to_tb(writer, epoch, loss_computer.get_stats(
+                model, args), loss_computer.n_groups, tag=tag)
             loss_computer.log_stats(logger, is_training)
             if is_training:
                 loss_computer.reset_stats()
 
 
-def train(model, criterion, dataset, 
-          logger, writer, train_csv_logger, val_csv_logger, test_csv_logger,
+def train(model, criterion, dataset,
+          logger, writer,
           args, epoch_offset):
-
 
     model = model.cuda()
 
+
+    if args.preference is not None:
+        preference = torch.from_numpy(np.array(args.preference, dtype=np.float32)).cuda()
+        preference /= preference.sum()        
+    else:
+        preference = None
+        
+    logger.write(f'Preference: {preference}\n')
+
     train_loss_computer = LossComputer(
         criterion,
-        dataset=dataset['train_data'])
+        dataset=dataset['train_data'],
+        pref=preference)
 
     # BERT uses its own scheduler and optimizer
     if 'bert' in args.model:
-        print("BERT model")
+        logger.write("BERT model")
         no_decay = ['bias', 'LayerNorm.weight']
         optimizer_grouped_parameters = [
-            {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
-            {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-            ]
+            {'params': [p for n, p in model.named_parameters() if not any(
+                nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+            {'params': [p for n, p in model.named_parameters() if any(
+                nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
         optimizer = AdamW(
             optimizer_grouped_parameters,
             lr=args.lr,
             eps=args.adam_epsilon)
         t_total = len(dataset['train_loader']) * args.n_epochs
-        print(f'\nt_total is {t_total}\n')
+        logger.write(f'\nt_total is {t_total}\n')
         scheduler = WarmupLinearSchedule(
             optimizer,
             warmup_steps=args.warmup_steps,
@@ -160,10 +173,11 @@ def train(model, criterion, dataset,
                 threshold=0.0001,
                 min_lr=0,
                 eps=1e-08)
-        elif 'vit' in args.model.lower():
+        elif "vit" in args.model.lower():
             scheduler = make_scheduler(
-                optimizer
+                optimizer, "cosine", args.warmup, args.n_epochs
             )
+            logger.write(f"\nUsing {scheduler} scheduler")
         else:
             scheduler = None
 
@@ -171,7 +185,7 @@ def train(model, criterion, dataset,
     enabled = set()
     for name, param in model.named_parameters():
         if param.requires_grad:
-            enabled.add(name)
+            enabled.add((name, param.shape))
     logger.write(f"Parameters to be updated: {enabled}")
 
     best_val_acc = 0
@@ -182,7 +196,7 @@ def train(model, criterion, dataset,
             epoch, model, criterion, optimizer,
             dataset, 'train_loader',
             train_loss_computer,
-            logger, writer, train_csv_logger, args,
+            logger, writer, args,
             is_training=True, tag="train",
             show_progress=True,
             log_every=args.log_every,
@@ -192,27 +206,27 @@ def train(model, criterion, dataset,
         val_loss_computer = LossComputer(
             criterion,
             dataset=dataset['val_data'],
-            )
+        )
         run_epoch(
             epoch, model, criterion, optimizer,
             dataset, 'val_loader',
             val_loss_computer,
-            logger, writer, val_csv_logger, args,
+            logger, writer, args,
             is_training=False, tag="val")
-        
+
         # Test set; don't print to avoid peeking
         if dataset['test_data'] is not None:
             logger.write(f'\nTest:\n')
             test_loss_computer = LossComputer(
                 criterion,
                 dataset=dataset['test_data'],
-                )
+            )
 
             run_epoch(
                 epoch, model, criterion, optimizer,
                 dataset, 'test_loader',
                 test_loss_computer,
-                logger, writer, test_csv_logger, args,
+                logger, writer,  args,
                 is_training=False, tag="test")
 
         # Inspect learning rates
@@ -223,7 +237,8 @@ def train(model, criterion, dataset,
 
         if args.scheduler and args.model != 'bert':
             val_loss = val_loss_computer.avg_group_loss
-            scheduler.step(val_loss) # scheduler step to update lr at the end of epoch
+            # scheduler step to update lr at the end of epoch
+            scheduler.step(val_loss)
 
         # if epoch % args.save_step == 0 and epoch > 0:
         #     # torch.save(model, os.path.join(args.log_dir, '%d_model.pth' % epoch))
@@ -242,10 +257,11 @@ def train(model, criterion, dataset,
             if curr_val_acc > best_val_acc:
                 best_val_acc = curr_val_acc
                 # torch.save(model, os.path.join(args.log_dir, 'best_model.pth'))
-                torch.save(model.state_dict(), os.path.join(args.log_dir, "best_model_weights.pt"))
-                np.save(os.path.join(args.log_dir, "best_epoch_num.npy"), [epoch])
+                torch.save(model.state_dict(), os.path.join(
+                    args.log_dir, "best_model_weights.pt"))
+                np.save(os.path.join(args.log_dir,
+                        "best_epoch_num.npy"), [epoch])
                 logger.write(f'Best model saved at epoch {epoch}\n')
-
 
         logger.write('\n')
 

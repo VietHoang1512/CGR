@@ -141,3 +141,44 @@ class PromptedVisionTransformer(VisionTransformer):
         if not vis:
             return logits
         return logits, attn_weights
+
+# Parameters to be updated: {('enc.transformer.prompt_embeddings', torch.Size([1, 10, 768])), ('enc.transformer.deep_prompt_embeddings', torch.Size([11, 10, 768])), ('head.last_layer.bias', torch.Size([2])), ('head.last_layer.weight', torch.Size([2, 768]))}
+class PromptGenerator(nn.Module):
+    def __init__(
+        self,
+        args, 
+        config, 
+        preference_dim=4,
+        preference_embedding_dim=64,
+    ):
+        super().__init__()
+            
+        total_d_layer = config.transformer["num_layers"]-1
+        prompt_dim = config.hidden_size
+
+        self.preference_embedding_matrix = nn.Embedding(
+            num_embeddings=preference_dim, embedding_dim=preference_embedding_dim
+        )        
+        
+        self.layer_to_shape = {('enc.transformer.prompt_embeddings', torch.Size([1, args.num_tokens, prompt_dim])), ('enc.transformer.deep_prompt_embeddings', torch.Size([total_d_layer , args.num_tokens, prompt_dim])), ('head.last_layer.bias', torch.Size([2])), ('head.last_layer.weight', torch.Size([2, prompt_dim]))}
+        
+        for layer_name, shape in self.layer_to_shape:
+            length = torch.prod(shape)
+            layer = nn.Linear(preference_embedding_dim, length)
+            # nn.init.xavier_uniform_(layer.weight)
+            setattr(self, layer_name, layer)
+    def forward(self, preference):
+        # preference embedding
+        pref_embedding = torch.zeros(
+            (self.preference_embedding_dim,), device=preference.device
+        )
+        for i, pref in enumerate(preference):
+            pref_embedding += (
+                self.preference_embedding_matrix(
+                    torch.tensor([i], device=preference.device)
+                ).squeeze(0)
+                * pref
+            )       
+        for layer_name, shape in self.layer_to_shape:
+            layer = getattr(self, layer_name)
+            pref_embedding = layer(pref_embedding).view(shape) 
