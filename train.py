@@ -52,7 +52,8 @@ def run_epoch(epoch, model, criterion, optimizer, train_loader, test_loader_dict
         g = batch[2]
 
         outputs = model(x)
-
+        utils.update_dict(train_acc_groups, y, g, outputs)
+        
         losses = loss_computer.loss(outputs, y, g)
 
         optimizer.zero_grad()
@@ -73,7 +74,7 @@ def run_epoch(epoch, model, criterion, optimizer, train_loader, test_loader_dict
             results_dict = eval(model, test_loader_dict)
 
             for ds_name, acc_groups in results_dict.items():
-                utils.log_test_results(epoch, acc_groups, get_ys_func, ds_name)
+                utils.log_test_results(epoch, acc_groups, get_ys_func, ds_name, train_group_ratio)
 
             val_wga = utils.get_results(
                 results_dict["val"], get_ys_func, train_group_ratio
@@ -111,6 +112,12 @@ def train(model, criterion, train_loader, test_loader_dict, get_ys_func, args):
         lr=args.lr,
         momentum=0.9,
         weight_decay=args.weight_decay)
+
+    # optimizer = torch.optim.Adam(
+    #     filter(lambda p: p.requires_grad, model.parameters()),
+    #     lr=args.lr,
+    #     weight_decay=args.weight_decay)    
+    
     if args.scheduler:
         args.scheduler = make_scheduler(
             optimizer, "cosine", args.warmup, args.n_epochs
@@ -129,7 +136,10 @@ def train(model, criterion, train_loader, test_loader_dict, get_ys_func, args):
     
     for epoch in range(args.n_epochs):
         logging.info(f"Epoch: [{epoch+1}/{args.n_epochs}]")
+        
         train_acc_groups, val_wga, test_wga = run_epoch(epoch, model, criterion, optimizer, train_loader, test_loader_dict, get_ys_func, args, log_every=args.log_every, scheduler=args.scheduler, best_val_wga=best_val_wga, best_test_wga=best_test_wga)
+        utils.log_test_results(epoch, train_acc_groups, get_ys_func,  "train")
+        
         if val_wga > best_val_wga:
             best_val_wga = val_wga            
 

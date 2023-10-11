@@ -62,16 +62,13 @@ def get_results(acc_groups, get_ys_func, reweight_ratio=None):
         for g in groups
     }
     accs = np.array([acc_groups[g].avg for g in groups])
-
     all_correct = sum([acc_groups[g].sum for g in groups])
     all_total = sum([acc_groups[g].count for g in groups])
     results.update({"worst_accuracy": min(results.values())})
-
-    if reweight_ratio is None:
-        results.update({"mean_accuracy": all_correct / all_total})
-    else:
+    results.update({"mean_accuracy": all_correct / all_total})
+    if reweight_ratio is not None:
         results.update(
-            {"mean_accuracy": (np.array(accs) * np.array(reweight_ratio)).sum()}
+            {"avg_accuracy": (np.array(accs) * np.array(reweight_ratio)).sum()}
         )
     return results
 
@@ -96,7 +93,7 @@ def get_data(args):
     test_data_dir = args.test_data_dir if args.test_data_dir else args.data_dir
     testset_dict = {
         split: dataset_cls(basedir=test_data_dir, split=split, transform=test_transform)
-        for split in ["test", "val"]
+        for split in ["val", "test"]
     }
 
     # collate_fn = data.get_collate_fn(
@@ -121,7 +118,7 @@ def get_data(args):
 
     get_ys_func = partial(get_y_s, n_spurious=testset_dict["test"].n_spurious)
     logging_utils.log_data(
-        trainset, testset_dict["test"], testset_dict["val"], get_ys_func=get_ys_func
+        trainset,  testset_dict["val"], testset_dict["test"], get_ys_func=get_ys_func
     )
 
     return train_loader, test_loader_dict, get_ys_func

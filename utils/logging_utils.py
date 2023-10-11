@@ -70,15 +70,15 @@ def log_after_epoch(
 
 
 
-def log_test_results(epoch, acc_groups, get_ys_func, tag):
-    results = utils.get_results(acc_groups, get_ys_func)
+def log_test_results(epoch, acc_groups, get_ys_func, tag,  reweight_ratio=None):
+    results = utils.get_results(acc_groups, get_ys_func, reweight_ratio)
     logging.info(f"\n{tag} result:")
     logging.info(str(results))
 
 
 
-def log_data(train_data, test_data, val_data=None, get_ys_func=None):
-    for data, name in [(train_data, "Train"), (test_data, "Test"), (val_data, "Val")]:
+def log_data(train_data, val_data=None, test_data=None, get_ys_func=None):
+    for data, name in [(train_data, "Train"), (val_data, "Val"), (test_data, "Test")]:
         if data:
             logging.info(f"{name} Data (total {len(data)})\n")
             print("N groups ", data.n_groups)
