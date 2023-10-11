@@ -1,44 +1,75 @@
 import os
 import argparse
-import pandas as pd
 import torch
-
-from data import dfr_datasets
-from data.data import dataset_attributes, shift_types, log_data
-from utils import set_seed, Logger,  log_args, prepare_logging
+import logging
 from train import train
-
+import utils
 import models
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
 
-    # Settings
+    # Data args
     parser.add_argument(
-        '-d', '--dataset',
-        choices=list(dataset_attributes.keys()) + ["CivilComments", "FMOW"],
-        required=False)
-    parser.add_argument('-s', '--shift_type',
-                        choices=shift_types, required=False)
-    # Confounders
-    parser.add_argument('-t', '--target_name')
-    parser.add_argument('-c', '--confounder_names', nargs='+')
-    # Resume?
-    parser.add_argument('--resume', default=False, action='store_true')
-    # Label shifts
-    parser.add_argument('--minority_fraction', type=float)
-    parser.add_argument('--imbalance_ratio', type=float)
-    # Data
-    parser.add_argument('--fraction', type=float, default=1.0)
-    parser.add_argument('--root_dir', default=None)
-    parser.add_argument('--reweight_groups',
-                        action='store_true', default=False)
-    parser.add_argument('--augment_data', action='store_true', default=False)
-    parser.add_argument('--val_fraction', type=float, default=0.1)
-    # Objective
-    parser.add_argument('--alpha', type=float, default=0.2)
-    parser.add_argument('--hinge', default=False, action='store_true')
+        "--data_dir",
+        type=str,
+        required=False,
+        default="./dataset/waterbird/waterbird_complete95_forest2water2",
+        help="Train dataset directory",
+    )
+    parser.add_argument(
+        "--test_data_dir",
+        type=str,
+        default=None,
+        required=False,
+        help="Test data directory (default: <data_dir>)",
+    )
+    parser.add_argument(
+        "--data_transform",
+        type=str,
+        required=False,
+        default="AugWaterbirdsCelebATransform",
+        choices=[
+            "None",
+            "AugDominoTransform",
+            "NoAugDominoTransform",
+            "SimCLRDominoTransform",
+            "MaskedDominoTransform",
+            "AugWaterbirdsCelebATransform",
+            "SimCLRWaterbirdsCelebATransform",
+            "NoAugWaterbirdsCelebATransform",
+            "NoAugNoNormWaterbirdsCelebATransform",
+            "MaskedWaterbirdsCelebATransform",
+            "ImageNetAugmixTransform",
+            "ImageNetRandomErasingTransform",
+            "SimCLRCifarTransform",
+            "AlbertTokenizeTransform",
+            "BertTokenizeTransform",
+            "BertMultilingualTokenizeTransform",
+            "DebertaTokenizeTransform",
+            "WaterbirdsForCLIPTransform",
+        ],
+        help="Data preprocessing transformation",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        required=False,
+        default="SpuriousCorrelationDataset",
+        choices=[
+            "SpuriousCorrelationDataset",
+            "MultiNLIDataset",
+            "FakeSpuriousCIFAR10",
+            "WildsFMOW",
+            "WildsCivilCommentsCoarse",
+            "WildsCivilCommentsCoarseNM",
+            "DeBERTaMultiNLIDataset",
+            "BERTMultilingualMultiNLIDataset",
+        ],
+        help="Dataset type",
+    ) 
+
 
     # Model
     parser.add_argument(
@@ -74,128 +105,51 @@ def get_parser():
     # EPO:
 
     
-    parser.add_argument("--preference", nargs='+',  default=5, help="preference id")
+    parser.add_argument("--preference", nargs='+',  default=None, help="preference vector")
 
-    parser.add_argument('--gamma', type=float, default=0.1)
-    parser.add_argument('--minimum_variational_weight', type=float, default=0)
+    # parser.add_argument('--gamma', type=float, default=0.1)
+    # parser.add_argument('--minimum_variational_weight', type=float, default=0)
     # Misc
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--show_progress', default=False, action='store_true')
-    parser.add_argument('--log_dir', default='./logs')
+    # parser.add_argument('--show_progress', default=False, action='store_true')
     parser.add_argument('--log_every', default=50, type=int)
     parser.add_argument('--save_step', type=int, default=10)
     parser.add_argument('--save_best', action='store_true', default=False)
     parser.add_argument('--save_last', action='store_true', default=False)
 
-    # parser.add_argument('--dfr_data', action='store_true', default=False)
-    # parser.add_argument('--dfr_model', action='store_true', default=False)
 
-    # args = parser.parse_args()
     return parser
 
 
 def main(args):
 
-    check_args(args)
 
     # BERT-specific configs copied over from run_glue.py
-    if 'bert' in args.model:
-        args.max_grad_norm = 1.0
-        args.adam_epsilon = 1e-8
-        args.warmup_steps = 0
 
-    if os.path.exists(args.log_dir) and args.resume:
-        resume = True
-        mode = 'a'
-    else:
-        resume = False
-        mode = 'w'
+    args.max_grad_norm = 1.0
 
-    # Initialize logs
-    if not os.path.exists(args.log_dir):
-        os.makedirs(args.log_dir)
+    writer = utils.prepare_logging(args)
 
-    logger = Logger(os.path.join(args.log_dir, 'log.txt'), mode)
-    # Record args
-    log_args(args, logger)
-
-    # with open(os.path.join(args.log_dir, 'command.sh'), 'w') as f:
-    #     f.write(' '.join(sys.argv))
-    #     f.write('\n')
-    writer = prepare_logging(args.log_dir, args)
-
-    set_seed(args.seed)
+    utils.set_seed(args.seed)
 
     # Data
-    # Test data for label_shift_step is not implemented yet
-    test_data = None
-    test_loader = None
+    train_loader, test_loader_dict, get_ys_func = utils.get_data(args)
+    n_classes = train_loader.dataset.n_classes
 
-    train_data, val_data, test_data = dfr_datasets.prepare_data(
-        args, train=True)
-
-    loader_kwargs = {'batch_size': args.batch_size,
-                     'num_workers': 4, 'pin_memory': True}
-    train_loader = train_data.get_loader(
-        train=True, reweight_groups=args.reweight_groups, **loader_kwargs)
-    val_loader = val_data.get_loader(
-        train=False, reweight_groups=None, **loader_kwargs)
-    if test_data is not None:
-        test_loader = test_data.get_loader(
-            train=False, reweight_groups=None, **loader_kwargs)
-
-    data = {}
-    data['train_loader'] = train_loader
-    data['val_loader'] = val_loader
-    data['test_loader'] = test_loader
-    data['train_data'] = train_data
-    data['val_data'] = val_data
-    data['test_data'] = test_data
-    n_classes = train_data.n_classes
-
-    log_data(data, logger)
+    # log_data(data, logger)
     if "vit" in args.model.lower():
-        print("Using ViT")
+        logging.info("Using ViT")
         from models.vit.build_model import build_model
         model = build_model(args, n_classes)
 
     else:
-        print("Using DFR model")
+        logging.info("Using DFR model")
         model_cls = getattr(models, args.model)
         model = model_cls(n_classes)
 
-    logger.flush()
+    criterion = torch.nn.CrossEntropyLoss(reduction='none')
 
-    # Define the objective
-    if args.hinge:
-        assert args.dataset in ['CelebA', 'CUB']  # Only supports binary
-
-        def hinge_loss(yhat, y):
-            # The torch loss takes in three arguments so we need to split yhat
-            # It also expects classes in {+1.0, -1.0} whereas by default we give them in {0, 1}
-            # Furthermore, if y = 1 it expects the first input to be higher instead of the second,
-            # so we need to swap yhat[:, 0] and yhat[:, 1]...
-            torch_loss = torch.nn.MarginRankingLoss(
-                margin=1.0, reduction='none')
-            y = (y.float() * 2.0) - 1.0
-            return torch_loss(yhat[:, 1], yhat[:, 0], y)
-        criterion = hinge_loss
-    else:
-        criterion = torch.nn.CrossEntropyLoss(reduction='none')
-
-    epoch_offset = 0
-
-    train(model, criterion, data, logger, writer,
-          args, epoch_offset=epoch_offset)
-
-
-def check_args(args):
-    if args.shift_type == 'confounder':
-        assert args.confounder_names
-        assert args.target_name
-    elif args.shift_type.startswith('label_shift'):
-        assert args.minority_fraction
-        assert args.imbalance_ratio
+    train(model, criterion, train_loader, test_loader_dict, get_ys_func, args)
 
 
 if __name__ == '__main__':

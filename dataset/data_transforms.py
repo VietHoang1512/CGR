@@ -23,7 +23,7 @@ class RepeatTransform:
 class ColorDistortion(transforms.Compose):
     # adapted from https://github.com/p3i0t/SimCLR-CIFAR10/blob/master/simclr.py
     def __init__(self, s=0.5):
-        color_jitter = transforms.ColorJitter(0.8*s, 0.8*s, 0.8*s, 0.2*s)
+        color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
         rnd_color_jitter = transforms.RandomApply([color_jitter], p=0.8)
         rnd_gray = transforms.RandomGrayscale(p=0.2)
         self.transforms = [rnd_color_jitter, rnd_gray]
@@ -36,19 +36,19 @@ def _add_totensor_normalize(transform_lst, normalize_stats):
 
 
 def patchify(img, p):
-    x = einops.rearrange(img, 'c (h p) (w q) -> (h w) (p q c)', p=p, q=p)
+    x = einops.rearrange(img, "c (h p) (w q) -> (h w) (p q c)", p=p, q=p)
     return x
 
 
 def unpatchify(x, p, height):
     h = height // p
-    x = einops.rearrange(x, '(h w) (p q c) -> c (h p) (w q)', h=h, p=p, q=p)
+    x = einops.rearrange(x, "(h w) (p q c) -> c (h p) (w q)", h=h, p=p, q=p)
     return x
 
 
 class RandomPatchMask:
     # adapted from https://github.com/sthalles/SimCLR/blob/master/data_aug/view_generator.py
-    def __init__(self, mask_ratio, patch_size, mask_val=0.):
+    def __init__(self, mask_ratio, patch_size, mask_val=0.0):
         self.mask_ratio = mask_ratio
         self.patch_size = patch_size
         self.mask_val = mask_val
@@ -68,7 +68,8 @@ class BaseDominoTransform(transforms.Compose):
         if augment:
             self.transforms = [
                 transforms.RandomCrop((64, 32), (4, 4)),
-                transforms.RandomHorizontalFlip()]
+                transforms.RandomHorizontalFlip(),
+            ]
         _add_totensor_normalize(self.transforms, normalize_stats)
 
 
@@ -86,9 +87,7 @@ class MaskedDominoTransform(BaseDominoTransform):
     def __init__(self, train, mask_ratio=0.75):
         super().__init__(augment=train, normalize_stats=None)
         if train:
-            self.transforms.append(
-                RandomPatchMask(mask_ratio=mask_ratio, patch_size=4))
-
+            self.transforms.append(RandomPatchMask(mask_ratio=mask_ratio, patch_size=4))
 
 
 class SimCLRDominoTransform(transforms.Compose):
@@ -97,41 +96,11 @@ class SimCLRDominoTransform(transforms.Compose):
         if train or finetune:
             self.transforms = [
                 transforms.RandomResizedCrop((64, 32), (4, 4)),
-                transforms.RandomHorizontalFlip(p=0.5)]
+                transforms.RandomHorizontalFlip(p=0.5),
+            ]
         if train:
             self.transforms.append(ColorDistortion(s=0.5))
         _add_totensor_normalize(self.transforms, normalize_stats)
-
-
-# class BaseWaterbirdsCelebATransform(transforms.Compose):
-#     def __init__(self, augment, normalize_stats):
-#         target_resolution = (224, 224)
-#         resize_resolution = (256, 256)
-#         self.transforms = []
-#         if augment:
-#             self.transforms = [
-#             transforms.RandomResizedCrop(size=target_resolution),
-#             transforms.RandomHorizontalFlip(),
-#             transforms.RandomRotation(90),
-#             transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-#             transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-#             transforms.RandomChoice([
-#                 transforms.ColorJitter(brightness=0.5),
-#                 transforms.ColorJitter(contrast=0.5),
-#                 transforms.ColorJitter(saturation=0.5),
-#             ]),
-#             transforms.RandomChoice([
-#                 transforms.GaussianBlur(kernel_size=3),
-#                 transforms.GaussianBlur(kernel_size=5),
-#                 transforms.GaussianBlur(kernel_size=7),
-#             ]),
-#                 ]
-
-#         else:
-#             self.transforms = [
-#                 transforms.Resize(resize_resolution),
-#                 transforms.CenterCrop(target_resolution)]
-#         _add_totensor_normalize(self.transforms, normalize_stats)
 
 
 class BaseWaterbirdsCelebATransform(transforms.Compose):
@@ -145,13 +114,30 @@ class BaseWaterbirdsCelebATransform(transforms.Compose):
                     target_resolution,
                     scale=(0.7, 1.0),
                     ratio=(0.75, 1.3333333333333333),
-                    interpolation=2),
-                transforms.RandomHorizontalFlip()]
+                    interpolation=2,
+                ),
+                transforms.RandomHorizontalFlip(),
+            ]
         else:
             self.transforms = [
                 transforms.Resize(resize_resolution),
-                transforms.CenterCrop(target_resolution)]
+                transforms.CenterCrop(target_resolution),
+            ]
         _add_totensor_normalize(self.transforms, normalize_stats)
+
+
+class WaterbirdsForCLIPTransform(transforms.Compose):
+    def __init__(self, train):
+        n_px = 224
+        self.transforms = [
+            transforms.Resize(n_px, interpolation=transforms.InterpolationMode.BICUBIC),
+            transforms.CenterCrop(n_px),
+        ]
+        _add_totensor_normalize(
+            self.transforms,
+            ((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        )  # CLIP stats
+
 
 class AugWaterbirdsCelebATransform(BaseWaterbirdsCelebATransform):
     def __init__(self, train):
@@ -180,13 +166,14 @@ class MaskedWaterbirdsCelebATransform(BaseWaterbirdsCelebATransform):
         super().__init__(augment=False, normalize_stats=None)
         if train:
             self.transforms.append(
-                RandomPatchMask(mask_ratio=mask_ratio, patch_size=14))
+                RandomPatchMask(mask_ratio=mask_ratio, patch_size=14)
+            )
 
 
 class SimCLRWaterbirdsCelebATransform(BaseWaterbirdsCelebATransform):
     def __init__(self, train, finetune=False, normalize_stats=IMAGENET_STATS):
         super().__init__(augment=(train or finetune), normalize_stats=None)
-        self.transforms = self.transforms[:-1] # Remove ToTensor
+        self.transforms = self.transforms[:-1]  # Remove ToTensor
         if train:
             self.transforms.append(ColorDistortion(s=0.5))
         _add_totensor_normalize(self.transforms, normalize_stats)
@@ -198,7 +185,8 @@ class SimCLRCifarTransform(transforms.Compose):
         if train or finetune:
             self.transforms = [
                 transforms.RandomResizedCrop(32),
-                transforms.RandomHorizontalFlip(p=0.5)]
+                transforms.RandomHorizontalFlip(p=0.5),
+            ]
         if train:
             self.transforms.append(ColorDistortion(s=0.5))
         _add_totensor_normalize(self.transforms, normalize_stats)
@@ -217,34 +205,42 @@ class TokenizeTransform:
             return_tensors="pt",
         )
 
-        return torch.squeeze(torch.stack((
-            tokens["input_ids"], tokens["attention_mask"], 
-            tokens["token_type_ids"]), dim=2), dim=0)
+        return torch.squeeze(
+            torch.stack(
+                (
+                    tokens["input_ids"],
+                    tokens["attention_mask"],
+                    tokens["token_type_ids"],
+                ),
+                dim=2,
+            ),
+            dim=0,
+        )
 
 
 class BertTokenizeTransform(TokenizeTransform):
     def __init__(self, train):
-        super().__init__(
-                tokenizer=BertTokenizer.from_pretrained("bert-base-uncased"))
+        super().__init__(tokenizer=BertTokenizer.from_pretrained("bert-base-uncased"))
         del train
 
 
 class BertMultilingualTokenizeTransform(TokenizeTransform):
     def __init__(self, train):
-        super().__init__(tokenizer=BertTokenizer.from_pretrained(
-                "bert-base-multilingual-uncased"))
+        super().__init__(
+            tokenizer=BertTokenizer.from_pretrained("bert-base-multilingual-uncased")
+        )
         del train
 
 
 class DebertaTokenizeTransform(TokenizeTransform):
     def __init__(self, train):
-        super().__init__(tokenizer=DebertaV2Tokenizer.from_pretrained(
-                "microsoft/deberta-v3-base"))
+        super().__init__(
+            tokenizer=DebertaV2Tokenizer.from_pretrained("microsoft/deberta-v3-base")
+        )
         del train
 
 
 class AlbertTokenizeTransform(TokenizeTransform):
     def __init__(self, train):
-        super().__init__(tokenizer=AlbertTokenizer.from_pretrained(
-                "albert-base-v2"))
+        super().__init__(tokenizer=AlbertTokenizer.from_pretrained("albert-base-v2"))
         del train

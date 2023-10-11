@@ -51,7 +51,7 @@ def float_parameter(level, maxval):
     Returns:
         A float that results from scaling `maxval` according to `level`.
     """
-    return float(level) * maxval / 10.
+    return float(level) * maxval / 10.0
 
 
 def sample_level(n):
@@ -87,77 +87,112 @@ def shear_x(pil_img, level):
     level = float_parameter(sample_level(level), 0.3)
     if np.random.uniform() > 0.5:
         level = -level
-    return pil_img.transform((IMAGE_SIZE, IMAGE_SIZE),
-                                                     Image.AFFINE, (1, level, 0, 0, 1, 0),
-                                                     resample=Image.BILINEAR)
+    return pil_img.transform(
+        (IMAGE_SIZE, IMAGE_SIZE),
+        Image.AFFINE,
+        (1, level, 0, 0, 1, 0),
+        resample=Image.BILINEAR,
+    )
 
 
 def shear_y(pil_img, level):
     level = float_parameter(sample_level(level), 0.3)
     if np.random.uniform() > 0.5:
         level = -level
-    return pil_img.transform((IMAGE_SIZE, IMAGE_SIZE),
-                                                     Image.AFFINE, (1, 0, 0, level, 1, 0),
-                                                     resample=Image.BILINEAR)
+    return pil_img.transform(
+        (IMAGE_SIZE, IMAGE_SIZE),
+        Image.AFFINE,
+        (1, 0, 0, level, 1, 0),
+        resample=Image.BILINEAR,
+    )
 
 
 def translate_x(pil_img, level):
     level = int_parameter(sample_level(level), IMAGE_SIZE / 3)
     if np.random.random() > 0.5:
         level = -level
-    return pil_img.transform((IMAGE_SIZE, IMAGE_SIZE),
-                                                     Image.AFFINE, (1, 0, level, 0, 1, 0),
-                                                     resample=Image.BILINEAR)
+    return pil_img.transform(
+        (IMAGE_SIZE, IMAGE_SIZE),
+        Image.AFFINE,
+        (1, 0, level, 0, 1, 0),
+        resample=Image.BILINEAR,
+    )
 
 
 def translate_y(pil_img, level):
     level = int_parameter(sample_level(level), IMAGE_SIZE / 3)
     if np.random.random() > 0.5:
         level = -level
-    return pil_img.transform((IMAGE_SIZE, IMAGE_SIZE),
-                                                     Image.AFFINE, (1, 0, 0, 0, 1, level),
-                                                     resample=Image.BILINEAR)
+    return pil_img.transform(
+        (IMAGE_SIZE, IMAGE_SIZE),
+        Image.AFFINE,
+        (1, 0, 0, 0, 1, level),
+        resample=Image.BILINEAR,
+    )
 
 
 # operation that overlaps with ImageNet-C's test set
 def color(pil_img, level):
-        level = float_parameter(sample_level(level), 1.8) + 0.1
-        return ImageEnhance.Color(pil_img).enhance(level)
+    level = float_parameter(sample_level(level), 1.8) + 0.1
+    return ImageEnhance.Color(pil_img).enhance(level)
 
 
 # operation that overlaps with ImageNet-C's test set
 def contrast(pil_img, level):
-        level = float_parameter(sample_level(level), 1.8) + 0.1
-        return ImageEnhance.Contrast(pil_img).enhance(level)
+    level = float_parameter(sample_level(level), 1.8) + 0.1
+    return ImageEnhance.Contrast(pil_img).enhance(level)
 
 
 # operation that overlaps with ImageNet-C's test set
 def brightness(pil_img, level):
-        level = float_parameter(sample_level(level), 1.8) + 0.1
-        return ImageEnhance.Brightness(pil_img).enhance(level)
+    level = float_parameter(sample_level(level), 1.8) + 0.1
+    return ImageEnhance.Brightness(pil_img).enhance(level)
 
 
 # operation that overlaps with ImageNet-C's test set
 def sharpness(pil_img, level):
-        level = float_parameter(sample_level(level), 1.8) + 0.1
-        return ImageEnhance.Sharpness(pil_img).enhance(level)
+    level = float_parameter(sample_level(level), 1.8) + 0.1
+    return ImageEnhance.Sharpness(pil_img).enhance(level)
 
 
 AUGMENTATIONS = [
-        autocontrast, equalize, posterize, rotate, solarize, shear_x, shear_y,
-        translate_x, translate_y
+    autocontrast,
+    equalize,
+    posterize,
+    rotate,
+    solarize,
+    shear_x,
+    shear_y,
+    translate_x,
+    translate_y,
 ]
 
 AUGMENTATIONS_ALL = [
-        autocontrast, equalize, posterize, rotate, solarize, shear_x, shear_y,
-        translate_x, translate_y, color, contrast, brightness, sharpness
+    autocontrast,
+    equalize,
+    posterize,
+    rotate,
+    solarize,
+    shear_x,
+    shear_y,
+    translate_x,
+    translate_y,
+    color,
+    contrast,
+    brightness,
+    sharpness,
 ]
 
 
 class AugmixTransformBase:
     def __init__(
-        self, preprocess, aug_prob_coeff=1., mixture_width=3,
-        mixture_depth=-1, aug_severity=1, aug_list=AUGMENTATIONS_ALL, 
+        self,
+        preprocess,
+        aug_prob_coeff=1.0,
+        mixture_width=3,
+        mixture_depth=-1,
+        aug_severity=1,
+        aug_list=AUGMENTATIONS_ALL,
     ):
         self.aug_list = aug_list
         self.aug_prob_coeff = aug_prob_coeff
@@ -167,19 +202,19 @@ class AugmixTransformBase:
         self.preprocess = preprocess
 
     def __call__(self, image):
-
         aug_list = AUGMENTATIONS_ALL
 
-        ws = np.float32(
-                np.random.dirichlet([self.aug_prob_coeff] * self.mixture_width))
+        ws = np.float32(np.random.dirichlet([self.aug_prob_coeff] * self.mixture_width))
         m = np.float32(np.random.beta(self.aug_prob_coeff, self.aug_prob_coeff))
 
         mix = torch.zeros_like(self.preprocess(image))
         for i in range(self.mixture_width):
             image_aug = image.copy()
             depth = (
-                self.mixture_depth if self.mixture_depth > 0 
-                else np.random.randint(1, 4))
+                self.mixture_depth
+                if self.mixture_depth > 0
+                else np.random.randint(1, 4)
+            )
             for _ in range(depth):
                 op = np.random.choice(aug_list)
                 image_aug = op(image_aug, self.aug_severity)
@@ -192,16 +227,17 @@ class AugmixTransformBase:
 
 class ImageNetAugmixTransform(transforms.Compose):
     def __init__(self, train):
-        preprocess = [
-            transforms.ToTensor(), transforms.Normalize(*IMAGENET_STATS)]
+        preprocess = [transforms.ToTensor(), transforms.Normalize(*IMAGENET_STATS)]
         preprocess = transforms.Compose(preprocess)
         if train:
             self.transforms = [
                 transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
-                AugmixTransformBase(preprocess=preprocess)]
+                AugmixTransformBase(preprocess=preprocess),
+            ]
         else:
             self.transforms = [
                 transforms.Resize(256),
                 transforms.CenterCrop(224),
-                preprocess]
+                preprocess,
+            ]
