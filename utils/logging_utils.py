@@ -21,8 +21,8 @@ def prepare_logging(args):
     
     for k, v in vars(args).items():
         print(k, "=", v)
-        if "/" not in str(v):
-            args.output_dir += f"/{k}={v}"
+        # if "/" not in str(v):
+        args.output_dir += f"/{k}={v}"
     
     os.system("rm -rf " + args.output_dir)
     os.makedirs(args.output_dir, exist_ok=True)
