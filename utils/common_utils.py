@@ -106,7 +106,7 @@ def get_data(args):
     }
     train_group_weights = len(trainset)/trainset.group_counts
     train_weights = train_group_weights[trainset.group_array]
-
+    train_weights = train_weights**args.alpha
     # Replacement needs to be set to True, otherwise we'll run out of minority samples
     train_loader = DataLoader(
         trainset, shuffle=False, sampler = WeightedRandomSampler(train_weights, len(trainset), replacement=True), **loader_kwargs  # collate_fn=collate_fn,

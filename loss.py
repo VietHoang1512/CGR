@@ -50,20 +50,20 @@ class LossComputer:
     def get_gradient(self, model):
         grad = []
         for _, param in model.named_parameters():
-            # if param.requires_grad:
-            if param.grad is not None:
-                grad.append(param.grad.data.clone().flatten())
-            else:
-                grad.append(torch.zeros_like(param.data).flatten())
+            if param.requires_grad:
+                if param.grad is not None:
+                    grad.append(param.grad.data.clone().flatten())
+                else:
+                    grad.append(torch.zeros_like(param.data).flatten())
         return torch.cat(grad)
 
     def set_gradient(self, model, grad):
         offset = 0
         for name, param in model.named_parameters():
-            # if param.requires_grad:
-            numel = param.data.numel()
-            param.grad = grad[offset:offset+numel].view(param.data.shape)
-            offset += numel
+            if param.requires_grad:
+                numel = param.data.numel()
+                param.grad = grad[offset:offset+numel].view(param.data.shape)
+                offset += numel
         assert offset == grad.numel(
         ), f"Size mismatched {offset} != {grad.numel()}"
 

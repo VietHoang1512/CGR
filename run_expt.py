@@ -69,7 +69,7 @@ def get_parser():
         ],
         help="Dataset type",
     ) 
-
+    parser.add_argument('--alpha', type=float, default=.5,  help="Reweight group power")
 
     # Model
     parser.add_argument(

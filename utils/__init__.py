@@ -11,3 +11,4 @@ from .logging_utils import log_after_epoch
 from .logging_utils import log_test_results
 from .logging_utils import log_data
 from .logging_utils import log_optimizer
+from .logging_utils import log_model_info

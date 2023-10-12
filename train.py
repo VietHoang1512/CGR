@@ -100,7 +100,8 @@ def run_epoch(epoch, model, criterion, optimizer, train_loader, test_loader_dict
 def train(model, criterion, train_loader, test_loader_dict, get_ys_func, args):
 
     model = model.cuda()
-
+    utils.log_model_info(model)
+    
     if args.preference is not None:
         args.preference = torch.from_numpy(np.array(args.preference, dtype=np.float32)).cuda()
         args.preference /= args.preference.sum()         

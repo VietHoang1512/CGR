@@ -17,9 +17,13 @@ def write_dict_to_tb(writer, dict, prefix, step):
 
 
 def prepare_logging(args):
-    args.output_dir = "outputs/" + str(args).replace(", ", "/").replace(
-        "'", ""
-    ).replace("(", "").replace(")", "").replace("Namespace", "")
+    args.output_dir = "outputs/"
+    
+    for k, v in vars(args).items():
+        print(k, "=", v)
+        if "/" not in str(v):
+            args.output_dir += f"/{k}={v}"
+    
     os.system("rm -rf " + args.output_dir)
     os.makedirs(args.output_dir, exist_ok=True)
 
@@ -94,3 +98,14 @@ def log_optimizer(writer, optimizer, epoch):
     group = optimizer.param_groups[0]
     hypers = {name: group[name] for name in ["lr", "weight_decay"]}
     write_dict_to_tb(writer, hypers, "optimizer_hypers", epoch)
+
+def log_model_info(model, verbose=False):
+    """Logs model info"""
+    if verbose:
+        logging.info(f"Classification Model:\n{model}")
+    model_total_params = sum(p.numel() for p in model.parameters())
+    model_grad_params = sum(
+        p.numel() for p in model.parameters() if p.requires_grad)
+    logging.info("Total Parameters: {0}\t Gradient Parameters: {1}".format(
+        model_total_params, model_grad_params))
+    logging.info("Tuned percent:%.3f"%(model_grad_params/model_total_params*100))
