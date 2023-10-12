@@ -148,7 +148,7 @@ def EPO(grads_list, losses, ray):
     if alpha is None:  # A patch for the issue in cvxpy
         alpha = (ray / ray.sum()).cpu().numpy()
 
-    alpha *= n_grads
+    # alpha *= n_grads
     alpha = torch.from_numpy(alpha).to(G.device)
 
     return sum([alpha[i] * grads_list[i] for i in range(len(grads_list))])

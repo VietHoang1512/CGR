@@ -10,7 +10,6 @@ from .datasets import WildsCivilCommentsCoarseNM
 from .datasets import remove_minority_groups
 from .datasets import balance_groups
 
-from .dataloaders import get_sampler
 from .dataloaders import get_collate_fn
 
 from .data_transforms import RepeatTransform
@@ -20,6 +19,7 @@ from .data_transforms import NoAugDominoTransform
 from .data_transforms import SimCLRDominoTransform
 from .data_transforms import MaskedDominoTransform
 from .data_transforms import AugWaterbirdsCelebATransform
+from .data_transforms import WaterbirdsForCLIPTransform
 from .data_transforms import NoAugWaterbirdsCelebATransform
 from .data_transforms import NoAugNoNormWaterbirdsCelebATransform
 from .data_transforms import SimCLRCifarTransform
@@ -31,4 +31,3 @@ from .data_transforms import BertMultilingualTokenizeTransform
 from .data_transforms import AlbertTokenizeTransform
 from .data_transforms import DebertaTokenizeTransform
 from .augmix_transforms import ImageNetAugmixTransform
-

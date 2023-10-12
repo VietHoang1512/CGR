@@ -39,14 +39,3 @@ def get_sampler_counts(counts, permutation=None):
         except:
             weights = weights[permutation.long()]
     return WeightedRandomSampler(weights, sum(counts).item(), replacement=True)
-
-
-def get_sampler(data, args):
-    sampler = None
-    if args.reweight_groups:
-        sampler = get_sampler_counts(data.group_counts, data.group_array)
-    elif args.reweight_classes:
-        sampler = get_sampler_counts(data.y_counts, data.y_array)
-    elif args.reweight_spurious:
-        sampler = get_sampler_counts(data.spurious_counts, data.spurious_array)
-    return sampler
