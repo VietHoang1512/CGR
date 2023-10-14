@@ -92,7 +92,7 @@ def get_parser():
         default="imtl",
         help="MTL weight method",
     )
-    parser.add_argument('--num_tokens', type=int, default=5)
+    parser.add_argument('--num_tokens', type=int, default=10)
 
     # Optimization
     parser.add_argument('--n_epochs', type=int, default=4)
