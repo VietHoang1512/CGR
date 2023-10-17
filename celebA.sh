@@ -23,7 +23,7 @@ cd /scratch/hvp2011/implement/dfr/dfr_group_DRO/
 
 # python run_expt.py --seed 2  --moo_method epo --preference 1 1 1 1  --scheduler --num_tokens 10  --lr .1 --batch_size 128 --alpha 1 --weight_decay 0.0001 --model imagenet21k_ViT-B_16 --warmup 10 --n_epochs 50 --log_every 200 --data_dir /scratch/hvp2011/implement/spurious-correlation/data/celebA
 # python run_expt.py --seed 1  --moo_method epo --preference 1 1 1 1   --num_tokens 10  --lr .001 --batch_size 128 --alpha 1 --weight_decay 0.0001 --model imagenet_resnet50_pretrained --warmup 10 --n_epochs 50 --log_every 200 --data_dir /scratch/hvp2011/implement/spurious-correlation/data/celebA
-python run_expt.py --seed 10  --moo_method epo --preference 1 1 1 1   --num_tokens 20   --lr .01 --batch_size 128 --alpha 1.2 --weight_decay 0.0001 --model imagenet21k_ViT-B_16 --warmup 10 --n_epochs 50 --log_every 200 --data_dir /scratch/hvp2011/implement/spurious-correlation/data/celebA
+python run_expt.py --seed 0  --moo_method epo --preference 1 1 1 1   --num_tokens 15   --lr .1 --scheduler --batch_size 128 --alpha 1. --weight_decay 0.001 --model imagenet21k_ViT-B_16 --warmup 10 --n_epochs 50 --log_every 200 --data_dir /scratch/hvp2011/implement/spurious-correlation/data/celebA
 
 # python run_expt.py --seed 0  --moo_method epo --preference 1 1 1 1 --num_tokens 10  --lr .1 --batch_size 128 --alpha 1 --weight_decay 0.0001 --model imagenet21k_ViT-B_16 --warmup 10 --n_epochs 50 --log_every 200 
 # python run_expt.py --seed 1  --moo_method epo --preference 1 1 1 1 --num_tokens 10  --lr .1 --batch_size 128 --alpha 1 --weight_decay 0.0001 --model imagenet21k_ViT-B_16 --warmup 10 --n_epochs 50 --log_every 200 

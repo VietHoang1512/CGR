@@ -1,4 +1,5 @@
 from .datasets import SpuriousCorrelationDataset
+from .datasets import MetaShiftDataset
 from .datasets import MultiNLIDataset
 from .datasets import DeBERTaMultiNLIDataset
 from .datasets import BERTMultilingualMultiNLIDataset

@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from weight_methods import MGDA, PCGrad, CAGrad, IMTL, EW, EPO
+from weight_methods import MGDA, BGDA, PCGrad, CAGrad, IMTL, EW, EPO
 
 gradient_aggregators = {
     "mgda": MGDA,
@@ -8,7 +8,8 @@ gradient_aggregators = {
     "cagrad": CAGrad,
     "imtl": IMTL,
     "ew": EW,
-    "epo": EPO
+    "epo": EPO,
+    "bgda": BGDA
 }
 
 

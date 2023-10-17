@@ -66,7 +66,8 @@ def get_results(acc_groups, get_ys_func, reweight_ratio=None):
     all_total = sum([acc_groups[g].count for g in groups])
     results.update({"worst_accuracy": min(results.values())})
     results.update({"mean_accuracy": all_correct / all_total})
-    if reweight_ratio is not None:
+    #TODO: assert length for Metashift Dataset only
+    if reweight_ratio is not None and len(reweight_ratio) == len(accs):
         results.update(
             {"avg_accuracy": (np.array(accs) * np.array(reweight_ratio)).sum()}
         )

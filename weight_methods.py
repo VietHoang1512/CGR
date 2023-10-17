@@ -8,6 +8,7 @@ import torch
 import cvxopt
 import cvxpy as cp
 
+
 def PCGrad(grads: List[Tuple[torch.Tensor]], losses=None, ray=None, reduction: str = "sum") -> torch.Tensor:
     grads = [[grad] for grad in grads]
     pc_grad = copy.deepcopy(grads)
@@ -112,13 +113,32 @@ def IMTL(grads_list, losses=None, ray=None):
 def MGDA(grads_list, losses=None, ray=None):
     n_grads = len(grads_list)
     sol, _ = MinNormSolver.find_min_norm_element(grads_list)
-    return torch.stack([n_grads * sol[i] * grads_list[i] for i in range(n_grads)]).sum(
+    return torch.stack([sol[i] * grads_list[i] for i in range(n_grads)]).sum(
+        0
+    )
+
+
+def BGDA(grads_list, losses=None, ray=None):
+    n_grads = len(grads_list)
+    softmax_losses = torch.softmax(losses, dim=0)
+    log_softmax_losses = torch.log(softmax_losses)
+    entropy = -torch.sum(softmax_losses * log_softmax_losses)
+
+    entropy_grad = -torch.stack([(softmax_losses[i]*entropy+softmax_losses[i]*log_softmax_losses[i]) * grads_list[i] for i in range(n_grads)]).sum(
+        0, keepdim=True
+    )
+    
+    grads_list  = torch.cat([grads_list, entropy_grad], dim=0)
+    n_grads = len(grads_list)
+    sol, _ = MinNormSolver.find_min_norm_element(grads_list)
+    return torch.stack([sol[i] * grads_list[i] for i in range(n_grads)]).sum(
         0
     )
 
 
 def EW(grads_list, losses=None, ray=None):
     return grads_list.sum(0)
+
 
 def circle_points(K, min_angle=None, max_angle=None):
     # generate evenly distributed preference vector
@@ -129,10 +149,12 @@ def circle_points(K, min_angle=None, max_angle=None):
     y = np.sin(angles)
     return np.c_[x, y]
 
+
 def EPO(grads_list, losses, ray):
     n_grads = len(grads_list)
-    lp = ExactParetoLP(m=n_grads, n=grads_list[0].shape[0], r=ray.cpu().numpy())
-    
+    lp = ExactParetoLP(
+        m=n_grads, n=grads_list[0].shape[0], r=ray.cpu().numpy())
+
     G = grads_list
     GG_T = G @ G.T
     GG_T = GG_T.detach().cpu().numpy()
@@ -152,7 +174,7 @@ def EPO(grads_list, losses, ray):
     alpha = torch.from_numpy(alpha).to(G.device)
 
     return sum([alpha[i] * grads_list[i] for i in range(len(grads_list))])
- 
+
 
 class ExactParetoLP(object):
     """modifications of the code in https://github.com/dbmptr/EPOSearch"""
@@ -243,8 +265,6 @@ def adjustments(l, r=1):
     mu_rl = mu(l_hat, normed=True)
     a = r * (np.log(l_hat * m) - mu_rl)
     return rl, mu_rl, a
-
-
 
 
 class MinNormSolver:
@@ -388,21 +408,23 @@ class MinNormSolver:
 
 
 def gradient_normalizers(grads, losses, normalization_type):
-    gn = {}
+    n_grads = len(grads)
+    gn = torch.zeros(n_grads).to(grads.device)
     if normalization_type == "l2":
-        for t in grads:
-            gn[t] = np.sqrt(np.sum([gr.pow(2).sum().data.cpu() for gr in grads[t]]))
+        for i in range(n_grads):
+            gn[i] = torch.sqrt(torch.sum([gr.pow(2).sum()
+                            for gr in grads]))
     elif normalization_type == "loss":
-        for t in grads:
-            gn[t] = losses[t]
+        for i in range(n_grads):
+            gn[i] = losses[i]
     elif normalization_type == "loss+":
-        for t in grads:
-            gn[t] = losses[t] * np.sqrt(
-                np.sum([gr.pow(2).sum().data.cpu() for gr in grads[t]])
+        for i in range(n_grads):
+            gn[i] = losses[t] * torch.sqrt(
+                torch.sum([gr.pow(2).sum() for gr in grads])
             )
     elif normalization_type == "none":
-        for t in grads:
-            gn[t] = 1.0
+        for i in range(n_grads):
+            gn[i] = 1.0
     else:
         print("ERROR: Invalid Normalization Type")
     return gn

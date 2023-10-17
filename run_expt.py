@@ -66,6 +66,7 @@ def get_parser():
             "WildsCivilCommentsCoarseNM",
             "DeBERTaMultiNLIDataset",
             "BERTMultilingualMultiNLIDataset",
+            "MetaShiftDataset"
         ],
         help="Dataset type",
     ) 
@@ -87,7 +88,8 @@ def get_parser():
             "cagrad",
             "imtl",
             "ew",
-            "epo"
+            "epo",
+            "bgda"
         ],
         default="imtl",
         help="MTL weight method",
@@ -101,6 +103,8 @@ def get_parser():
     parser.add_argument('--scheduler', action='store_true', default=False)
     parser.add_argument('--weight_decay', type=float, default=5e-5)
     parser.add_argument('--warmup', default=5, type=int)
+    parser.add_argument('--max_grad_norm', type=float, default=1)
+    
 
     # EPO:
 
@@ -126,7 +130,7 @@ def main(args):
 
     # BERT-specific configs copied over from run_glue.py
 
-    args.max_grad_norm = 1.0
+    # args.max_grad_norm = 1.0
 
     writer = utils.prepare_logging(args)
 
