@@ -138,6 +138,26 @@ class WaterbirdsForCLIPTransform(transforms.Compose):
             ((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         )  # CLIP stats
 
+class ISICTransform(transforms.Compose):
+    def __init__(self, train, normalize_stats=IMAGENET_STATS):
+        target_resolution = (224, 224)
+        resize_resolution = (256, 256)
+        self.transforms = []
+        if train:
+            self.transforms = [
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomResizedCrop(target_resolution, scale=(0.75, 1.0)),
+                transforms.RandomRotation(45),
+                transforms.ColorJitter(hue=0.2),
+            ]
+        else:
+            self.transforms = [
+                transforms.Resize(target_resolution),
+                transforms.ColorJitter(hue=0.2),
+            ]
+        _add_totensor_normalize(self.transforms, normalize_stats)
+
 
 class AugWaterbirdsCelebATransform(BaseWaterbirdsCelebATransform):
     def __init__(self, train):

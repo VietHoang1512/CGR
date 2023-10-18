@@ -1,5 +1,6 @@
 from .datasets import SpuriousCorrelationDataset
 from .datasets import MetaShiftDataset
+from .datasets import ISICDataset
 from .datasets import MultiNLIDataset
 from .datasets import DeBERTaMultiNLIDataset
 from .datasets import BERTMultilingualMultiNLIDataset
@@ -20,6 +21,7 @@ from .data_transforms import NoAugDominoTransform
 from .data_transforms import SimCLRDominoTransform
 from .data_transforms import MaskedDominoTransform
 from .data_transforms import AugWaterbirdsCelebATransform
+from .data_transforms import ISICTransform
 from .data_transforms import WaterbirdsForCLIPTransform
 from .data_transforms import NoAugWaterbirdsCelebATransform
 from .data_transforms import NoAugNoNormWaterbirdsCelebATransform

@@ -11,12 +11,12 @@ data_root = osp.join(ROOT, 'data')
 os.makedirs(data_root, exist_ok=True)
 
 # Download metashift
-output = 'metashifts.zip'
-url = 'https://drive.google.com/uc?id=1WySOxBRkxAUlSokgZrC-0JaWZwcG5UMT'
-if not osp.exists(osp.join(data_root, 'metashifts')):
-    gdown.download(url, osp.join(data_root, output), quiet=False)
-    with zipfile.ZipFile(osp.join(data_root, output), 'r') as zip_ref:
-        zip_ref.extractall(data_root)
+# output = 'metashifts.zip'
+# url = 'https://drive.google.com/uc?id=1WySOxBRkxAUlSokgZrC-0JaWZwcG5UMT'
+# if not osp.exists(osp.join(data_root, 'metashifts')):
+#     gdown.download(url, osp.join(data_root, output), quiet=False)
+#     with zipfile.ZipFile(osp.join(data_root, output), 'r') as zip_ref:
+#         zip_ref.extractall(data_root)
 
 # Download waterbirds
 # if not osp.exists(osp.join(data_root, 'cub')):

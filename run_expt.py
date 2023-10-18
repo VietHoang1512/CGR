@@ -49,6 +49,7 @@ def get_parser():
             "BertMultilingualTokenizeTransform",
             "DebertaTokenizeTransform",
             "WaterbirdsForCLIPTransform",
+            "ISICTransform"
         ],
         help="Data preprocessing transformation",
     )
@@ -66,7 +67,8 @@ def get_parser():
             "WildsCivilCommentsCoarseNM",
             "DeBERTaMultiNLIDataset",
             "BERTMultilingualMultiNLIDataset",
-            "MetaShiftDataset"
+            "MetaShiftDataset",
+            "ISICDataset"
         ],
         help="Dataset type",
     ) 

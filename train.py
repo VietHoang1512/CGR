@@ -2,9 +2,10 @@ import os
 import gc
 from tqdm import tqdm
 import logging
-
+from sklearn.metrics import roc_auc_score
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 import utils
 from loss import LossComputer
@@ -12,7 +13,7 @@ from models.vit.schedulers import make_scheduler
 
 
 
-def eval(model, test_loader_dict, device="cuda"):
+def eval(model, test_loader_dict, return_auc=False, device="cuda"):
     model.eval()
     results_dict = {}
     with torch.no_grad():
@@ -20,11 +21,24 @@ def eval(model, test_loader_dict, device="cuda"):
             acc_groups = {
                 g_idx: utils.AverageMeter() for g_idx in range(test_loader.dataset.n_groups)
             }
+            probs, ys = [], []
             for batch in tqdm(test_loader):
                 x, y, group, *_ = batch
                 x, y = x.to(device), y.to(device)
                 logits = model(x)
+                
                 utils.update_dict(acc_groups, y, group, logits)
+                if return_auc:
+                    prob = F.softmax(logits, dim=-1)[:,1].view(-1)
+                    probs.append(prob.detach().cpu())
+                    ys.append(y.detach().cpu())
+                
+                    
+            if return_auc:
+                probs = np.concatenate(probs)
+                ys = np.concatenate(ys)
+                roc_auc = roc_auc_score(ys, probs)    
+                acc_groups["roc_auc"] = roc_auc
             results_dict[test_name] = acc_groups
     return results_dict
 
@@ -71,7 +85,7 @@ def run_epoch(epoch, model, criterion, optimizer, train_loader, test_loader_dict
 
         if (batch_idx+1)== len(prog_bar_loader) or (batch_idx+1) % log_every == 0:
 
-            results_dict = eval(model, test_loader_dict)
+            results_dict = eval(model, test_loader_dict, return_auc="isic" in args.dataset.lower())
 
             for ds_name, acc_groups in results_dict.items():
                 utils.log_test_results(epoch, acc_groups, get_ys_func, ds_name, train_group_ratio)

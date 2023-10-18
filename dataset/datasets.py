@@ -511,7 +511,81 @@ class MetaShiftDataset(Dataset):
             img = self.transform(img)
         return img
 
+class ISICDataset(Dataset):
+    """
+    ISIC dataset      
+    """
+    def __init__(self, basedir, split="train", transform=None, id_val=True):
 
+        self.split_dir = os.path.join(basedir, 'trap-sets')
+        self.data_dir = os.path.join(basedir, 'ISIC2018_Task1-2_Training_Input')
+        self.transform = transform
+        
+        GROUP = 5 # following https://github.com/Wuyxin/DISC/blob/master/scripts/isic.sh
+        metadata = {}
+        metadata['train'] = pd.read_csv(os.path.join(self.split_dir, f'isic_annotated_train{GROUP}.csv'))
+        if id_val:
+            test_val_data = pd.read_csv(os.path.join(self.split_dir, f'isic_annotated_test{GROUP}.csv'))
+            idx_val, idx_test = train_test_split(np.arange(len(test_val_data)), 
+                                                test_size=0.8, random_state=0)
+            metadata['test'] = test_val_data.iloc[idx_test]
+            metadata['val'] = test_val_data.iloc[idx_val]
+            
+        else:
+            metadata['test'] = pd.read_csv(os.path.join(self.split_dir, f'isic_annotated_test{GROUP}.csv'))
+            metadata['val'] = pd.read_csv(os.path.join(self.split_dir, f'isic_annotated_val{GROUP}.csv'))
+            # subtracting two dataframes 
+            metadata_new = metadata['train'].merge(metadata['val'], how='left', indicator=True)
+            metadata_new = metadata_new[metadata_new['_merge'] == 'left_only']
+            metadata['train'] = metadata_new.drop(columns=['_merge'])
+        
+        confounder = 'hair'
+        
+        self.filename_array = np.array(metadata[split]['image'] )
+        self.spurious_array = np.array(metadata[split][confounder])
+        self.y_array = np.array(metadata[split]["label"])      
+        self._count_attributes()
+        self._get_class_spurious_groups()
+        self._count_groups()        
+        
+    def _count_attributes(self):
+        self.n_classes = np.unique(self.y_array).size
+        self.n_spurious = np.unique(self.spurious_array).size
+        self.y_counts = self._bincount_array_as_tensor(self.y_array)
+        self.spurious_counts = self._bincount_array_as_tensor(self.spurious_array)
+
+    def _count_groups(self):
+        self.group_counts = self._bincount_array_as_tensor(self.group_array)
+        # self.n_groups = np.unique(self.group_array).size
+        self.n_groups = len(self.group_counts)
+        self.group_ratio = self.group_counts / self.group_counts.sum()
+
+    def _get_class_spurious_groups(self):
+        self.group_array = _cast_int(
+            self.y_array * self.n_spurious + self.spurious_array
+        )
+
+    @staticmethod
+    def _bincount_array_as_tensor(arr):
+        return torch.from_numpy(np.bincount(arr)).long()
+
+    def __len__(self):
+        return len(self.y_array)
+
+    def __getitem__(self, idx):
+        y = self.y_array[idx]
+        g = self.group_array[idx]
+        s = self.spurious_array[idx]
+        x = self._image_getitem(idx)
+        return x, y, g, s
+
+    def _image_getitem(self, idx):
+        img_path = os.path.join(self.data_dir, self.filename_array[idx])[:-4] + '.jpg'
+        img = Image.open(img_path).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        return img
+    
 if __name__ == "__main__":
     from data_transforms import AugWaterbirdsCelebATransform
     transform = AugWaterbirdsCelebATransform(train=True)

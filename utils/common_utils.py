@@ -56,7 +56,7 @@ def update_dict(acc_groups, y, g, logits):
 
 def get_results(acc_groups, get_ys_func, reweight_ratio=None):
     # TODO(izmailovpavel): add mean acc on train group distribution: DONE
-    groups = acc_groups.keys()
+    groups = [key for key in acc_groups.keys() if key != "roc_auc"]
     results = {
         f"accuracy_{get_ys_func(g)[0]}_{get_ys_func(g)[1]}": acc_groups[g].avg
         for g in groups
@@ -64,7 +64,10 @@ def get_results(acc_groups, get_ys_func, reweight_ratio=None):
     accs = np.array([acc_groups[g].avg for g in groups])
     all_correct = sum([acc_groups[g].sum for g in groups])
     all_total = sum([acc_groups[g].count for g in groups])
-    results.update({"worst_accuracy": min(results.values())})
+    if  "roc_auc" in acc_groups.keys():
+        results.update({"worst_accuracy": acc_groups["roc_auc"]})
+    else:
+        results.update({"worst_accuracy": min(results.values())})
     results.update({"mean_accuracy": all_correct / all_total})
     #TODO: assert length for Metashift Dataset only
     if reweight_ratio is not None and len(reweight_ratio) == len(accs):
