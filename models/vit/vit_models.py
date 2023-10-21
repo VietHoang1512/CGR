@@ -69,3 +69,7 @@ class ViT(nn.Module):
         """get a (batch_size, self.feat_dim) feature"""
         x = self.enc(x)  # batch_size x self.feat_dim
         return x
+
+    def get_state_dict(self):
+        state_dict = {k:v for k, v in self.state_dict().items() if "prompt" in k or k.startswith("head")}
+        return state_dict

@@ -4,8 +4,6 @@ import torch
 import logging
 from train import train
 import utils
-import models
-
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -113,8 +111,6 @@ def get_parser():
     
     parser.add_argument("--preference", nargs='+',  default=None, help="preference vector")
 
-    # parser.add_argument('--gamma', type=float, default=0.1)
-    # parser.add_argument('--minimum_variational_weight', type=float, default=0)
     # Misc
     parser.add_argument('--seed', type=int, default=0)
     # parser.add_argument('--show_progress', default=False, action='store_true')
@@ -147,8 +143,22 @@ def main(args):
         logging.info("Using ViT")
         from models.vit.build_model import build_model
         model = build_model(args, n_classes)
+    elif args.model.lower().startswith("clip-"):
+        from models.clip.text_prompt import TextPrompt
 
+        args.model = args.model[5:] 
+
+        #TODO: add support for other datasets
+        metadata_map = {
+            # Padding for str formatting
+            "generic-spurious": ["bird on land", "bird on water"],
+            "spurious": ["land background", "water background"],
+            "target": ["landbird", "waterbird"],
+        }
+
+        model = TextPrompt(args, metadata_map)
     else:
+        import models
         logging.info("Using DFR model")
         model_cls = getattr(models, args.model)
         model = model_cls(n_classes)

@@ -30,5 +30,5 @@ def get_current_device():
 
 def load_model_to_device(model):
     cur_device = get_current_device()
-    model = model.cuda(device=cur_device)
+    model = model.to(cur_device)
     return model, cur_device

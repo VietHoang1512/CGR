@@ -18,7 +18,7 @@ nvidia-smi
 cd /scratch/hvp2011/implement/dfr/dfr_group_DRO/
 
 
-# alpha=1.
+# alpha=2.
 # lr=.0003
 
 # for weight_decay in  .01 .001 
@@ -32,4 +32,7 @@ cd /scratch/hvp2011/implement/dfr/dfr_group_DRO/
 # done
 
 
-python run_expt.py  --seed 1  --moo_method epo --preference 1 1 1 1 --log_every 30   --num_tokens 10  --lr .003 --batch_size 16 --weight_decay .001 --alpha 1.5 --model imagenet21k_ViT-B_16  --n_epochs 50 --dataset ISICDataset --data_transform ISICTransform --data_dir /vast/hvp2011/data/isic
+# python run_expt.py  --seed 1  --moo_method epo --preference 1 1 1 1 --log_every 30   --num_tokens 10  --lr .003 --batch_size 16 --weight_decay .001 --alpha 1.5 --model imagenet21k_ViT-B_16  --n_epochs 50 --dataset ISICDataset --data_transform ISICTransform --data_dir /vast/hvp2011/data/isic
+
+
+python run_expt.py --seed 1215 --moo_method epo --preference 1 1 1 1 --log_every 30 --num_tokens 5 --lr .003 --batch_size 16 --weight_decay .01 --alpha 1.5 --model imagenet21k_ViT-B_16 --n_epochs 50 --dataset ISICDataset --data_transform ISICTransform --data_dir /vast/hvp2011/data/isic
