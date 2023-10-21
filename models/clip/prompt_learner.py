@@ -2,27 +2,8 @@ import torch
 import torch.nn as nn
 
 from models.clip import clip
-from models.clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
-
-_tokenizer = _Tokenizer()
 
 
-def load_clip_to_cpu(cfg):
-    backbone_name = cfg.backbonename
-    url = clip._MODELS[backbone_name]
-    model_path = clip._download(url)
-
-    try:
-        # loading JIT archive
-        model = torch.jit.load(model_path, map_location="cpu").eval()
-        state_dict = None
-
-    except RuntimeError:
-        state_dict = torch.load(model_path, map_location="cpu")
-
-    model = clip.build_model(state_dict or model.state_dict())
-
-    return model
 
 
 class TextEncoder(nn.Module):

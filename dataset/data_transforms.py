@@ -129,10 +129,44 @@ class BaseWaterbirdsCelebATransform(transforms.Compose):
 class WaterbirdsForCLIPTransform(transforms.Compose):
     def __init__(self, train):
         n_px = 224
-        self.transforms = [
-            transforms.Resize(n_px, interpolation=transforms.InterpolationMode.BICUBIC),
-            transforms.CenterCrop(n_px),
-        ]
+        if train:        
+            self.transforms = [
+                transforms.RandomResizedCrop(
+                    (n_px, n_px),
+                    scale=(0.7, 1.0),
+                    ratio=(0.75, 1.3333333333333333),
+                    interpolation=transforms.InterpolationMode.BICUBIC,
+                ),
+                transforms.RandomHorizontalFlip(),
+            ]
+        else:
+            self.transforms = [
+                transforms.Resize(n_px, interpolation=transforms.InterpolationMode.BICUBIC),
+                transforms.CenterCrop(n_px),
+            ]            
+        _add_totensor_normalize(
+            self.transforms,
+            ((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        )  # CLIP stats
+
+class WaterbirdsForBigCLIPTransform(transforms.Compose):
+    def __init__(self, train):
+        n_px = 336
+        if train:        
+            self.transforms = [
+                transforms.RandomResizedCrop(
+                    (n_px, n_px),
+                    scale=(0.7, 1.0),
+                    ratio=(0.75, 1.3333333333333333),
+                    interpolation=transforms.InterpolationMode.BICUBIC,
+                ),
+                transforms.RandomHorizontalFlip(),
+            ]
+        else:
+            self.transforms = [
+                transforms.Resize(n_px, interpolation=transforms.InterpolationMode.BICUBIC),
+                transforms.CenterCrop(n_px),
+            ]            
         _add_totensor_normalize(
             self.transforms,
             ((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),

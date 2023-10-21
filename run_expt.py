@@ -28,27 +28,6 @@ def get_parser():
         type=str,
         required=False,
         default="AugWaterbirdsCelebATransform",
-        choices=[
-            "None",
-            "AugDominoTransform",
-            "NoAugDominoTransform",
-            "SimCLRDominoTransform",
-            "MaskedDominoTransform",
-            "AugWaterbirdsCelebATransform",
-            "SimCLRWaterbirdsCelebATransform",
-            "NoAugWaterbirdsCelebATransform",
-            "NoAugNoNormWaterbirdsCelebATransform",
-            "MaskedWaterbirdsCelebATransform",
-            "ImageNetAugmixTransform",
-            "ImageNetRandomErasingTransform",
-            "SimCLRCifarTransform",
-            "AlbertTokenizeTransform",
-            "BertTokenizeTransform",
-            "BertMultilingualTokenizeTransform",
-            "DebertaTokenizeTransform",
-            "WaterbirdsForCLIPTransform",
-            "ISICTransform"
-        ],
         help="Data preprocessing transformation",
     )
     parser.add_argument(
@@ -138,12 +117,8 @@ def main(args):
     train_loader, test_loader_dict, get_ys_func = utils.get_data(args)
     n_classes = train_loader.dataset.n_classes
 
-    # log_data(data, logger)
-    if "vit" in args.model.lower():
-        logging.info("Using ViT")
-        from models.vit.build_model import build_model
-        model = build_model(args, n_classes)
-    elif args.model.lower().startswith("clip-"):
+
+    if args.model.lower().startswith("clip-"):
         from models.clip.text_prompt import TextPrompt
 
         args.model = args.model[5:] 
@@ -157,6 +132,12 @@ def main(args):
         }
 
         model = TextPrompt(args, metadata_map)
+
+    elif "vit" in args.model.lower():
+        logging.info("Using ViT")
+        from models.vit.build_model import build_model
+        model = build_model(args, n_classes)
+
     else:
         import models
         logging.info("Using DFR model")

@@ -144,6 +144,8 @@ def train(model, criterion, train_loader, test_loader_dict, get_ys_func, args):
     for name, param in model.named_parameters():
         if param.requires_grad:
             enabled.add((name, param.shape))
+            print(name, param.shape, param.requires_grad)
+        
     logging.info(f"Parameters to be updated: {enabled}\n")
 
     best_val_wga=0

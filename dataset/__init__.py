@@ -23,6 +23,7 @@ from .data_transforms import MaskedDominoTransform
 from .data_transforms import AugWaterbirdsCelebATransform
 from .data_transforms import ISICTransform
 from .data_transforms import WaterbirdsForCLIPTransform
+from .data_transforms import WaterbirdsForBigCLIPTransform
 from .data_transforms import NoAugWaterbirdsCelebATransform
 from .data_transforms import NoAugNoNormWaterbirdsCelebATransform
 from .data_transforms import SimCLRCifarTransform

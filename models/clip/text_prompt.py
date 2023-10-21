@@ -1,10 +1,15 @@
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
-from torch.cuda.amp import autocast
-
 
 from . import clip
+
+
+def template_prompt(args):
+    if "waterbird" in args.data_dir:
+        return "a type of bird, a photo of a"
+    raise NotImplementedError(
+        "template prompt not implemented for this dataset" + args.data_dir)
+
 
 class TextEncoder(nn.Module):
     def __init__(self, clip_model):
@@ -24,7 +29,7 @@ class TextEncoder(nn.Module):
 
         # x.shape = [batch_size, n_ctx, transformer.width]
         # take features from the eot embedding (eot_token is the highest number in each sequence)
-        
+
         x = x[torch.arange(x.shape[0]), tokenized_prompts.argmax(
             dim=-1)] @ self.text_projection
 
@@ -40,56 +45,55 @@ class PromptLearner(nn.Module):
 
         self.n_ctx = args.num_tokens
 
-        original_prompt_prefix = "a photo of a".replace("_", " ")
+        template = template_prompt(args)
+        template_n_ctx = len(template.split(" "))
+        assert self.n_ctx >= template_n_ctx, f"#tokens ({self.n_ctx}) should larger equal than #initial prompt tokens ({template_n_ctx}, {template})"
+
+        template_tokens = clip.tokenize(template)
+        with torch.no_grad():
+            template_embedding = clip_model.token_embedding(
+                template_tokens).type(dtype)
 
         ctx_vectors = torch.empty(args.num_tokens, ctx_dim, dtype=dtype)
-        nn.init.normal_(ctx_vectors, std=0.02)
+        # nn.init.normal_(ctx_vectors, std=0.02) 
 
         print("ctx vectors size: ", ctx_vectors.shape)
-        prompt_prefix = " ".join(["X"] * args.num_tokens)
+
+        ctx_vectors[self.n_ctx - template_n_ctx:,
+                    :] = template_embedding[0, 1:1 + template_n_ctx, :]
+
+        prompt_prefix = " ".join(["X"] * (args.num_tokens-template_n_ctx))
+        prompt_prefix = f"{prompt_prefix} {template}"
 
         self.ctx = nn.Parameter(ctx_vectors)  # to be optimized
 
-        classnames = [name.replace("_", " ")
-                      for name in metadata_map["target"]]
+        classnames = metadata_map["target"]
 
         print(f'Initial context: "{prompt_prefix}"')
         print(f"Number of context words (tokens): {self.n_ctx}")
 
-
         self.n_cls = len(classnames)
-
-        # original_prompts = [
-        #     original_prompt_prefix + " " + name + "." for name in classnames
-        # ]
 
         prompts = [prompt_prefix + " " + name + "." for name in classnames]
 
         tokenized_prompts = torch.cat([clip.tokenize(p) for p in prompts])
-        # original_tokenized_prompts = torch.cat(
-        #     [clip.tokenize(p) for p in original_prompts])
+
 
         with torch.no_grad():
             embedding = clip_model.token_embedding(tokenized_prompts).type(
                 dtype)
-            # original_embedding = clip_model.token_embedding(
-            #     original_tokenized_prompts).type(dtype)
+            print("embedding size: ", embedding.shape)
 
         # These token vectors will be saved when in save_model(),
         # but they should be ignored in load_model() as we want to use
         # those computed using the current class names
-
-        # TODO: Try different ways of fusing the original and new prompts
-        # tokenized_prompts = torch.cat(
-        #     [tokenized_prompts, original_tokenized_prompts])
 
         self.register_buffer("token_prefix", embedding[:, :1, :])  # SOS
         self.register_buffer("token_suffix", embedding[:,
                                                        1 + self.n_ctx:, :])  # CLS, EOS
 
         self.tokenized_prompts = tokenized_prompts  # torch.Tensor
-        # self.original_embedding = original_embedding.to(
-        #     torch.device("cuda"))
+
 
     def forward(self):
         ctx = self.ctx
@@ -124,11 +128,9 @@ class TextPrompt(nn.Module):
         self.logit_scale = clip_model.logit_scale
         self.dtype = clip_model.dtype
 
-
         for k, p in self.named_parameters():
             if "prompt_learner" not in k:
                 p.requires_grad = False
-            print(k, p.requires_grad)
 
     # @autocast()
     def forward(self, image):
