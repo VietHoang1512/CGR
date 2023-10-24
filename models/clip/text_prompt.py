@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from . import clip
-
+from .imagenet_templates import IMAGENET_TEMPLATES
 
 def template_prompt(args):
     if "waterbird" in args.data_dir:
@@ -44,20 +44,38 @@ class PromptLearner(nn.Module):
         ctx_dim = clip_model.ln_final.weight.shape[0]
 
         self.n_ctx = args.num_tokens
-
+        classnames = metadata_map["target"]
+        self.n_cls = len(classnames)
+        ctx_vectors = torch.empty(args.num_tokens, ctx_dim, dtype=dtype)
+        # nn.init.normal_(ctx_vectors, std=0.02) 
+        print("ctx vectors size: ", ctx_vectors.shape)
+        
+        
         template = template_prompt(args)
         template_n_ctx = len(template.split(" "))
         assert self.n_ctx >= template_n_ctx, f"#tokens ({self.n_ctx}) should larger equal than #initial prompt tokens ({template_n_ctx}, {template})"
 
+        
         template_tokens = clip.tokenize(template)
         with torch.no_grad():
-            template_embedding = clip_model.token_embedding(
-                template_tokens).type(dtype)
-
-        ctx_vectors = torch.empty(args.num_tokens, ctx_dim, dtype=dtype)
-        # nn.init.normal_(ctx_vectors, std=0.02) 
-
-        print("ctx vectors size: ", ctx_vectors.shape)
+            if args.multi_prompt:
+                imagenet_template_embeddings = []
+                for imagenet_template in IMAGENET_TEMPLATES:
+                    imagenet_template_n_ctx = len(imagenet_template.split(" "))
+                    if self.n_ctx < imagenet_template_n_ctx:
+                        print(f"#tokens ({self.n_ctx}) should larger equal than #initial prompt tokens ({imagenet_template_n_ctx}, {imagenet_template})")
+                    imagenet_template_tokens = clip.tokenize(imagenet_template)
+                    imagenet_template_embedding = clip_model.token_embedding(
+                            imagenet_template_tokens).type(dtype)                        
+                    imagenet_template_embeddings.append(imagenet_template_embedding)
+                template_embedding = torch.stack(imagenet_template_embeddings).mean(dim=0).type(dtype)
+                # TODO: Try this:
+                nn.init.normal_(ctx_vectors, std=0.02)
+            else:
+                
+                nn.init.normal_(ctx_vectors, std=0.02)
+                template_embedding = clip_model.token_embedding(
+                    template_tokens).type(dtype)
 
         ctx_vectors[self.n_ctx - template_n_ctx:,
                     :] = template_embedding[0, 1:1 + template_n_ctx, :]
@@ -67,12 +85,8 @@ class PromptLearner(nn.Module):
 
         self.ctx = nn.Parameter(ctx_vectors)  # to be optimized
 
-        classnames = metadata_map["target"]
-
         print(f'Initial context: "{prompt_prefix}"')
-        print(f"Number of context words (tokens): {self.n_ctx}")
-
-        self.n_cls = len(classnames)
+        print(f"Number of context words (tokens): {self.n_ctx}") 
 
         prompts = [prompt_prefix + " " + name + "." for name in classnames]
 
@@ -84,9 +98,6 @@ class PromptLearner(nn.Module):
                 dtype)
             print("embedding size: ", embedding.shape)
 
-        # These token vectors will be saved when in save_model(),
-        # but they should be ignored in load_model() as we want to use
-        # those computed using the current class names
 
         self.register_buffer("token_prefix", embedding[:, :1, :])  # SOS
         self.register_buffer("token_suffix", embedding[:,

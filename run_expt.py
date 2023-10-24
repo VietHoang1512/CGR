@@ -74,6 +74,7 @@ def get_parser():
         help="MTL weight method",
     )
     parser.add_argument('--num_tokens', type=int, default=10)
+    parser.add_argument('--multi_prompt', action='store_true', default=False)
 
     # Optimization
     parser.add_argument('--n_epochs', type=int, default=4)
