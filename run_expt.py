@@ -68,7 +68,9 @@ def get_parser():
             "imtl",
             "ew",
             "epo",
-            "bgda"
+            "bgda",
+            "groupdro",
+            "erm"
         ],
         default="imtl",
         help="MTL weight method",
@@ -120,7 +122,7 @@ def main(args):
 
 
     if args.model.lower().startswith("clip-"):
-        from models.clip.text_prompt import TextPrompt
+        from models.clip.text_prompt import TextPrompt, FullCLIP
 
         args.model = args.model[5:] 
 
@@ -131,8 +133,11 @@ def main(args):
             "spurious": ["land background", "water background"],
             "target": ["landbird", "waterbird"],
         }
-
-        model = TextPrompt(args, metadata_map)
+        if args.model.lower().startswith("linear-"):
+            args.model = args.model[7:]
+            model = FullCLIP(args, metadata_map)
+        else:
+            model = TextPrompt(args, metadata_map)
 
     elif "vit" in args.model.lower():
         logging.info("Using ViT")

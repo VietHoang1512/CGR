@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -158,3 +159,65 @@ class TextPrompt(nn.Module):
         logits = logit_scale * image_features @ text_features.t()
 
         return logits
+
+class FullCLIP(nn.Module):
+    def __init__(self, args, metadata_map, templates=IMAGENET_TEMPLATES):
+        super(FullCLIP, self).__init__()
+        self.model, _ = clip.load(args.model, device="cuda")
+        self.model.float()     
+        self.metadata_map = metadata_map
+        self.classnames = metadata_map["target"]
+        self.templates = templates
+        # self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+        self.logit_scale = self.model.logit_scale
+        self.zeroshot_weights = self.zeroshot_weights()
+        
+        for param in self.model.parameters():
+            param.requires_grad = False
+                    
+        if 'rn' in args.model.lower():
+            for param in self.model.visual._modules['attnpool'].parameters():
+                param.requires_grad = True
+        elif 'vit' in args.model.lower():
+            self.model.visual.proj.requires_grad = True        
+    def zeroshot_classifier(self, classnames, avg=True):
+        """
+        Zero-shot classifier for pre-trained CLIP models.
+        """
+        zeroshot_weights = []
+        for classname in classnames:
+            texts = [f"{template} {classname}" for template in self.templates] #format with class
+            texts = clip.tokenize(texts).cuda() #tokenize
+            class_embeddings = self.model.encode_text(texts) #embed with text encoder
+            class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
+            if not avg:
+                zeroshot_weights.append(class_embeddings)
+            else:
+                class_embedding = class_embeddings.mean(dim=0)
+                class_embedding = class_embedding / class_embedding.norm()
+                zeroshot_weights.append(class_embedding)
+        zeroshot_weights = torch.stack(zeroshot_weights, dim=1).cuda()
+        return zeroshot_weights
+
+    def zeroshot_weights(self):
+        return self.zeroshot_classifier(self.classnames).detach().clone()
+
+    def featurizer(self, input):
+        input_features = self.model.encode_image(input)
+        input_features = input_features / input_features.norm(dim=-1, keepdim=True)
+        return input_features
+
+    def classifier(self, input_features):
+        logits = self.logit_scale.exp() * input_features @ self.zeroshot_weights
+        return logits
+
+    def forward(self, input, return_features=False):
+        input_features = self.featurizer(input)
+        logits = self.classifier(input_features)
+        if return_features:
+            return logits, input_features
+        else:
+            return logits
+    
+    def train(self, mode=True):
+        self.model.train(mode)
